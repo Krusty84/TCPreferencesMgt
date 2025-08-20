@@ -1,0 +1,15 @@
+{
+  "originHash" : "2245ae39ad70f6df8b473e9d2f49bc9ff5285e407d3be24c0448e99e4f8ca727",
+  "pins" : [
+    {
+      "identity" : "tcswiftbridge",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/Krusty84/TCSwiftBridge",
+      "state" : {
+        "branch" : "main",
+        "revision" : "dda5590d1277b1f3a27f1b77bffd9d5111ef13fb"
+      }
+    }
+  ],
+  "version" : 3
+}
