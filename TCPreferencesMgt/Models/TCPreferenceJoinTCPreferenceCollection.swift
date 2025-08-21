@@ -8,23 +8,8 @@
 import SwiftData
 import Foundation
 
-//@Model
-//final class TCPreferenceJoinTCPreferenceCollection {
-//    var connectionID: UUID
-//
-//    @Relationship var preference: TCPreference?
-//    @Relationship var collection: TCPreferenceCollection?
-//
-//    init(preference: TCPreference, collection: TCPreferenceCollection, connectionID: UUID) {
-//        self.preference = preference
-//        self.collection = collection
-//        self.connectionID = connectionID
-//    }
-//}
-
-
- @Model
- final class TCPreferenceJoinTCPreferenceCollection {
+@Model
+final class TCPreferenceJoinTCPreferenceCollection {
      var preference: TCPreference?
      var collection: TCPreferenceCollection?
      var connectionID: UUID
@@ -34,4 +19,4 @@ import Foundation
          self.collection = collection
          self.connectionID = connectionID
      }
- }
+}

@@ -12,7 +12,8 @@ struct TCConnectionEditorView: View {
     @Bindable var connection: TCConnection
 
     @StateObject private var vm = SettingsViewModel()
-
+    
+    var onDeleted: () -> Void = {}
     @State private var confirmDeleteConnection = false
     @State private var confirmDeletePrefs = false
     @State private var isBusy = false
@@ -24,61 +25,66 @@ struct TCConnectionEditorView: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            // Name + URL
-            VStack(alignment: .leading, spacing: 6) {
-                Text("Edit Connection").font(.headline)
-                TextField("Name", text: $connection.name)
-                    .textFieldStyle(RoundedBorderTextFieldStyle())
-                TextField("TC URL", text: $connection.url)
-                    .textFieldStyle(RoundedBorderTextFieldStyle())
-                TextField("Description", text: $connection.desc)
-                    .textFieldStyle(RoundedBorderTextFieldStyle())
-            }
-
-            // Username + Password + Status + Verify
-            HStack(spacing: 10) {
-                TextField("Username", text: $connection.username)
-                    .textFieldStyle(RoundedBorderTextFieldStyle())
-                    .frame(minWidth: 140)
-                SecureField("Password", text: $connection.password)
-                    .textFieldStyle(RoundedBorderTextFieldStyle())
-                    .frame(minWidth: 140)
-                tcStatusIndicator
-                Button("Verify") { Task {await vm.tcLogin(tcBaseUrl: connection.url, username: connection.username, password: connection.password)} }
+        ConnectionFormView(
+            title: "Edit Connection",
+            b: .init(
+                name: $connection.name,
+                url: $connection.url,
+                desc: $connection.desc,
+                username: $connection.username,
+                password: $connection.password
+            ),
+            rightTop: {                      // status + Verify button
+                HStack(spacing: 6) {
+                    tcStatusIndicator
+                    Button("Verify") {
+                        Task { await vm.tcLogin(tcBaseUrl: connection.url,
+                                                username: connection.username,
+                                                password: connection.password) }
+                    }
+                    .help("Check Teamcenter connection")
+                    .disabled(isBusy)
                     .frame(minWidth: 70)
-                Spacer()
-            }
+                }
+            },
+            footer: {   // Save / Delete / Import Buttons
+                HStack {
+                    Spacer()   // pushes everything to the right
 
-            // Buttons
-            HStack(spacing: 10) {
-                Button("Import Preferences") { importPreferences() }
-                Button(role: .destructive) { confirmDeletePrefs = true } label: {
-                    Text("Delete Preferences")
+                    HStack(spacing: 10) {
+                        Button {
+                            importPreferences()
+                        } label: {
+                            if isBusy {
+                                HStack(spacing: 6) {
+                                    ProgressView().controlSize(.small)
+                                    Text("Importing…")
+                                }
+                            } else {
+                                Text("Initial Import")
+                            }
+                        }
+                        .help("Initial import of Preferences")
+                        .disabled(isBusy)
+
+                        Button("Save Changes") { try? context.save() }
+                            .keyboardShortcut(.defaultAction)
+                            .help("Save changes")
+                            .disabled(isBusy || connection.name.trimmed.isEmpty || connection.url.trimmed.isEmpty)
+                    }
                 }
-                Spacer()
-                Button("Save Changes") { try? context.save() }
-                                   .keyboardShortcut(.defaultAction)
-                                   .disabled(connection.name.trimmingCharacters(in: .whitespaces).isEmpty ||
-                                             connection.url.trimmingCharacters(in: .whitespaces).isEmpty)
-                Button(role: .destructive) { confirmDeleteConnection = true } label: {
-                    Text("Delete Connection")
-                }
+                .padding(.top, 6)
+                
             }
-            .padding(.top, 6)
-        }
+        )
         // dialogs and alerts stay unchanged
-        .confirmationDialog("Delete all preferences for this connection?",
-                            isPresented: $confirmDeletePrefs,
-                            titleVisibility: .visible) {
-            Button("Cancel", role: .cancel) { }
-        }
         .confirmationDialog("Delete this connection?",
                             isPresented: $confirmDeleteConnection,
                             titleVisibility: .visible) {
-            Button("Delete", role: .destructive) {
+            Button("OK", role: .destructive) {
                 context.delete(connection)
                 try? context.save()
+                onDeleted()
             }
             Button("Cancel", role: .cancel) { }
         }

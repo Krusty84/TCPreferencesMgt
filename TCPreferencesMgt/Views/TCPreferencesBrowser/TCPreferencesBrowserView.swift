@@ -106,7 +106,7 @@ struct TCPreferencesBrowserView: View {
             
             // Status badge column (not sortable)
             TableColumn("") { p in
-                statusBadge(vm.status(for: p))
+                preferenceStatusBadge(vm.status(for: p))
                     .frame(width: 18, alignment: .center)
             }
             .width(10)
@@ -177,9 +177,8 @@ struct TCPreferencesBrowserView: View {
                                             }
                                         }
                                         .width(24)
-                                        
                                         TableColumn("") { p in
-                                            statusBadge(vm.status(for: p))
+                                            preferenceStatusBadge(vm.status(for: p))
                                                 .frame(width: 18, alignment: .center)
                                         }
                                         .width(24)
@@ -215,7 +214,7 @@ struct TCPreferencesBrowserView: View {
                                     .stroke(Color.secondary.opacity(0.25), lineWidth: 1)
                             )
                             .contextMenu {
-                                Button("Export Collection…") {
+                                Button("Export…") {
                                     let prefs = col.prefCollections.compactMap { $0.preference }
                                     if !prefs.isEmpty {
                                         vm.exportPrefCollectionXML(prefs, fileName: "Pref_\(col.name)_collection.xml")
@@ -223,9 +222,15 @@ struct TCPreferencesBrowserView: View {
                                 }
                                 .disabled(col.prefCollections.isEmpty)
                                 
+                                Button("Copy to clipboard…") {                    // ← NEW
+                                       let prefs = col.prefCollections.compactMap { $0.preference }
+                                        vm.copyPrefCollectionXML(prefs)
+                                   }
+                                   .disabled(col.prefCollections.isEmpty)
+                                
                                 Divider()
                                 
-                                Button("Delete Collection") {
+                                Button("Delete") {
                                     vm.deleteCollection(col)
                                 }
                                 .disabled(!col.prefCollections.isEmpty) // only enabled if empty
@@ -245,19 +250,21 @@ struct TCPreferencesBrowserView: View {
     private var generalPreferencesList: some View {
         VStack(alignment: .leading, spacing: 8) {
             VStack() {
-                TextField("Search by name, description, values, or comment", text: $vm.nameFilter)
+                TextField("Search by name, description, values ​​or comments among the loaded", text: $vm.nameFilter)
                     .textFieldStyle(.roundedBorder)
                 HStack {
                     Picker("Filter by category", selection: $vm.selectedCategory) {
                         Text("All").tag("All")
                         ForEach(vm.categories, id: \.self) { Text($0).tag($0) }
                     }
+                    .help("Category of preferences")
                     .labelsHidden()
                     
                     Picker("Filter by protection scope", selection: $vm.selectedScope) {
                         Text("All").tag("All")
                         ForEach(vm.scopes, id: \.self) { Text($0).tag($0) }
                     }
+                    .help("Level of impact of preferences")
                     .labelsHidden()
                 }
                 prefTable
@@ -266,7 +273,9 @@ struct TCPreferencesBrowserView: View {
             .contextMenu(forSelectionType: TCPreference.ID.self) { selection in
                 Button("Export…") { vm.exportPreferencesXML(selection: selection) }
                     .disabled(selection.isEmpty)
-                Button("Assign to Collection…") {
+                Button("Copy to clipboard…") { vm.copyPreferencesXML(selection: selection)}
+                    .disabled(selection.isEmpty)
+                Button("Assign to collection…") {
                     showAssignDialog = true
                 }
                 .disabled(selection.isEmpty)
@@ -274,20 +283,6 @@ struct TCPreferencesBrowserView: View {
             .sheet(isPresented: $showAssignDialog) {
                 assignCollectionSheet
             }
-        }
-        .frame(minWidth: 380, maxWidth: 480, maxHeight: .infinity)
-        // Keep your selection-driven context menu (works like in your snippet)
-        .contextMenu(forSelectionType: TCPreference.ID.self) { selection in
-            Button("Export…") { vm.exportPreferencesXML(selection: selection) }
-                .disabled(selection.isEmpty)
-            
-            Button("Assign to Collection…") {
-                showAssignDialog = true
-            }
-            .disabled(selection.isEmpty)
-        }
-        .sheet(isPresented: $showAssignDialog) {
-            assignCollectionSheet
         }
     }
     
@@ -300,7 +295,7 @@ struct TCPreferencesBrowserView: View {
             } else if !vm.lastSyncMessage.isEmpty {
                 Text(vm.lastSyncMessage).foregroundStyle(.secondary)
             } else {
-                Text("Preferences found: \(vm.filteredItems.count)")
+                Text("Total preferences: \(vm.connection?.preferences.count ?? 0)")
                     .foregroundStyle(.secondary)
             }
             
@@ -309,10 +304,10 @@ struct TCPreferencesBrowserView: View {
             Button("TC Sync") { vm.tcSync() }
                 .disabled(vm.isSyncing || vm.connection == nil)
             
-            Button("Reload") { vm.reloadAll() }
-                .disabled(vm.isSyncing)
+//            Button("Reload") { vm.reloadAll() }
+//                .disabled(vm.isSyncing)
             
-            Button("Load more") { vm.loadNextBatch() }
+            Button("Loaded \(vm.filteredItems.count)") { vm.loadNextBatch() }
                 .disabled(vm.allLoaded || vm.isSyncing)
         }
     }
@@ -387,16 +382,18 @@ struct TCPreferencesBrowserView: View {
                 .frame(minHeight: 140)
                 .listStyle(.inset)
                 
-                HStack {
-                    if vm.editValues {
-                        Button("Save Values") { vm.saveValues() }
-                            .keyboardShortcut(.defaultAction)
-                        Button("Cancel") { vm.cancelValues() }
-                    } else {
-                        Button("Edit Values") { vm.beginValuesEdit(from: p) }
-                    }
-                    Spacer()
-                }
+                //TODO: Maybe for future - edit value here
+                
+//                HStack {
+//                    if vm.editValues {
+//                        Button("Save Values") { vm.saveValues() }
+//                            .keyboardShortcut(.defaultAction)
+//                        Button("Cancel") { vm.cancelValues() }
+//                    } else {
+//                        Button("Edit Values") { vm.beginValuesEdit(from: p) }
+//                    }
+//                    Spacer()
+//                }
             }
         } label: {
             HStack {
@@ -422,25 +419,44 @@ struct TCPreferencesBrowserView: View {
                             .padding(6)
                     } else {
                         ForEach(revs) { rev in
-                            VStack(alignment: .leading, spacing: 4) {
-                                Text(rev.capturedAt.formatted(date: .numeric, time: .shortened))
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
-                                
+                            VStack(alignment: .leading, spacing: 6) {
+
+                                // Header row: timestamp + copy button
+                                HStack(spacing: 8) {
+                                    Text(rev.capturedAt.formatted(date: .numeric, time: .shortened))
+                                        .font(.caption)
+                                        .foregroundStyle(.secondary)
+
+                                    Spacer()
+
+                                    Button {
+                                        vm.copyHistoryRevisionXML(pref: p, rev: rev)
+                                    } label: {
+                                        Image(systemName: "doc.on.clipboard")
+                                    }
+                                    .buttonStyle(.borderless)
+                                    .help("Copy this revision of the preference to the clipboard")
+                                }
+
+                                // Values body
                                 if let vals = rev.values, !vals.isEmpty {
                                     Text(vals.joined(separator: ", "))
                                         .textSelection(.enabled)
                                         .font(.system(size: 13))
                                         .frame(maxWidth: .infinity, alignment: .leading)
                                 } else {
-                                    Text("—").foregroundStyle(.secondary)
+                                    Text("—")
+                                        .foregroundStyle(.secondary)
                                 }
                             }
                             .padding(6)
                             .frame(maxWidth: .infinity, alignment: .leading)
-                            
+                            .background(Color.gray.opacity(0.05))
+                            .cornerRadius(4)
+
                             Divider().opacity(0.25)
                         }
+                        
                     }
                 }
                 .padding(2)
@@ -459,7 +475,6 @@ struct TCPreferencesBrowserView: View {
                     .lineLimit(3...6)
                 HStack {
                     Button("Save Comment") { vm.saveComment() }
-                        .keyboardShortcut(.defaultAction)
                     Button("Cancel") { vm.cancelComment() }
                     Spacer()
                 }
@@ -468,7 +483,9 @@ struct TCPreferencesBrowserView: View {
                     Text(p.comment?.isEmpty == false ? p.comment! : "—")
                         .foregroundStyle(.secondary)
                     HStack {
-                        Button("Edit Comment") { vm.beginCommentEdit(from: p) }
+                        Button("Edit Comment")
+                            { vm.beginCommentEdit(from: p) }
+                            .help("Add your comment here")
                         Spacer()
                     }
                 }
@@ -528,13 +545,14 @@ struct TCPreferencesBrowserView: View {
                             Text(p.category.isEmpty ? "—" : p.category)
                                 .textSelection(.enabled)
                                 .frame(maxWidth: .infinity, alignment: .leading)
-                            Toggle("Filter by this", isOn: Binding(
+                            Toggle(isOn: Binding(
                                 get: { vm.pinCategoryFilter },
                                 set: { newVal in vm.setPinCategory(newVal, for: p) }
-                            ))
+                            )) {
+                                Image(systemName: "dot.scope")
+                            }
                             .toggleStyle(.checkbox)
-                            .labelsHidden()
-                            .help("Filter the list by category '\(p.category)'")
+                            .help("Filter the preferences by category '\(p.category)'")
                         }
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
@@ -587,7 +605,7 @@ struct TCPreferencesBrowserView: View {
     
     // MARK: - Status badge (UI-only)
     @ViewBuilder
-    private func statusBadge(_ s: TCPreferencesBrowserViewModel.PrefStatus) -> some View {
+    private func preferenceStatusBadge(_ s: TCPreferencesBrowserViewModel.PrefStatus) -> some View {
         switch s {
             case .new:
                 Image(systemName: "sparkles")

@@ -309,9 +309,58 @@ final class TCPreferencesBrowserViewModel: ObservableObject {
             do { try xml.data(using: .utf8)?.write(to: url) } catch { print("Export failed:", error) }
         }
     }
+    
+    func copyPreferencesXML(selection: Set<TCPreference.ID>) {
+        let chosen = prefs(from: selection)
+        guard !chosen.isEmpty else { return }
+        let xml = buildPreferencesXML(chosen)
+        copyToClipboard(xml)
+    }
+    
+    func copyPrefCollectionXML(_ prefs: [TCPreference]) {
+        guard !prefs.isEmpty else { return }
+        let xml = buildPreferencesXML(prefs)
+        copyToClipboard(xml)
+    }
+    
+    func copyHistoryRevisionXML(pref: TCPreference, rev: TCPreferenceRevision) {
+        var xml = ""
+        xml += "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
+        xml += "<preferences version=\"10.0\">\n"
+        xml += "  <category name=\"\(xmlEscape(pref.category))\">\n"
+        xml += "    <category_description></category_description>\n"
+        xml += "    <preference name=\"\(xmlEscape(pref.name))\" " +
+                "type=\"\(prefsTypeMapping(pref.type))\" array=\"\(pref.isArray ? "true" : "false")\" " +
+                "disabled=\"\(pref.isDisabled ? "true" : "false")\" " +
+                "protectionScope=\"\(xmlEscape(pref.protectionScope))\" " +
+                "envEnabled=\"\(pref.isEnvEnabled ? "true" : "false")\">\n"
+        
+        let desc = pref.prefDescription.isEmpty ? "" : xmlEscape(pref.prefDescription)
+        xml += "      <preference_description>\(desc)</preference_description>\n"
+
+        xml += "      <context name=\"Teamcenter\">\n"
+        if let vals = rev.values {
+            for v in vals {
+                xml += "        <value>\(xmlEscape(v))</value>\n"
+            }
+        }
+        xml += "      </context>\n"
+
+        xml += "    </preference>\n"
+        xml += "  </category>\n"
+        xml += "</preferences>\n"
+
+        copyToClipboard(xml)
+    }
 
     private func prefs(from selection: Set<TCPreference.ID>) -> [TCPreference] {
         items.filter { selection.contains($0.id) }
+    }
+    
+    private func copyToClipboard(_ text: String) {
+        let pb = NSPasteboard.general
+        pb.clearContents()
+        pb.setString(text, forType: .string)
     }
 
     func prefsTypeMapping(_ type: Int) -> String {

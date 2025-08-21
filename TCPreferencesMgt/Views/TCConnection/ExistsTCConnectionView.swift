@@ -13,12 +13,23 @@ struct ExistsTCConnectionView: View {
     @Environment(\.openWindow) private var openWindow
     @Environment(\.dismiss) private var dismiss
 
-    // Use UUID for selection (Hashable)
     @State private var selectionID: UUID? = nil
+
+    // Resolve selected connection from ID
+    private var selectedConnection: TCConnection? {
+        guard let id = selectionID else { return nil }
+        return connections.first(where: { $0.id == id })
+    }
+
+    // Can we open? Only if a connection is selected AND it has preferences
+    private var canOpen: Bool {
+        guard let conn = selectedConnection else { return false }
+        return !conn.preferences.isEmpty
+    }
 
     var body: some View {
         VStack(spacing: 12) {
-            Text("Exists Teamcenter Connections")
+            Text("Existing connections to Teamcenter")
                 .font(.title2)
 
             Group {
@@ -36,24 +47,44 @@ struct ExistsTCConnectionView: View {
                         ForEach(connections) { conn in
                             HStack {
                                 VStack(alignment: .leading, spacing: 2) {
-                                    Text(conn.name.isEmpty ? "(No name)" : conn.name)
-                                        .font(.headline)
+                                    HStack(spacing: 6) {
+                                        Text(conn.name.isEmpty ? "(No name)" : conn.name)
+                                            .font(.headline)
+                                        if !conn.desc.isEmpty {
+                                            Text("(\(conn.desc))")
+                                                .font(.caption)               // tiny font
+                                                .foregroundStyle(.secondary)  // subtle style
+                                        }
+                                    }
                                     Text(conn.url)
                                         .font(.subheadline)
                                         .foregroundStyle(.secondary)
                                 }
                                 Spacer()
-                                Text(conn.desc).foregroundStyle(.secondary)
+                                VStack(alignment: .leading, spacing: 2) {
+                                    // Show how many preferences the connection has
+                                    if conn.preferences.isEmpty {
+                                        Text("No preferences (Import before open)")
+                                            .foregroundStyle(.secondary)
+                                    } else {
+                                        Text("\(conn.preferences.count) preferences")
+                                            .foregroundStyle(.secondary)
+                                    }
+                                }
+                                
+                    
                             }
-                            .tag(conn.id) // tag with UUID for List(selection:)
-                            .contentShape(Rectangle()) // make the whole row clickable
-                            .onTapGesture {            // single click selects
+                            .tag(conn.id)
+                            .contentShape(Rectangle())
+                            .onTapGesture {
                                 selectionID = conn.id
                             }
-                            .onTapGesture(count: 2) {  // double-click opens
-                                open(conn.id)
+                            .onTapGesture(count: 2) {
+                                // Only open if the connection has preferences
+                                if !conn.preferences.isEmpty {
+                                    open(conn.id)
+                                }
                             }
-                            // Optional: subtle selected background
                             .listRowBackground(
                                 (selectionID == conn.id)
                                 ? Color.accentColor.opacity(0.12)
@@ -70,17 +101,18 @@ struct ExistsTCConnectionView: View {
                 Spacer()
                 Button("Cancel") { dismiss() }
                 Button("Open") {
-                    if let id = selectionID { open(id) }
+                    if let id = selectionID, canOpen { open(id) }
                 }
-                .keyboardShortcut(.defaultAction)
-                .disabled(selectionID == nil)            // <-- enable only when selected
+                //.keyboardShortcut(.defaultAction)
+                .disabled(!canOpen) // disable when none selected or no prefs
+                .help(canOpen ? "Open Preferences browser" : "This connection has no preferences yet")
             }
         }
         .padding(16)
     }
 
     private func open(_ id: UUID) {
-        openWindow(id: "connection", value: id)          // <-- pass UUID value
+        openWindow(id: "connection", value: id)
         dismiss()
     }
 }

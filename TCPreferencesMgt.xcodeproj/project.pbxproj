@@ -19,7 +19,6 @@
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
 				Info.plist,
-				Views/PrefsBrowserView_old.swift,
 			);
 			target = 3D4292672E4B6D4500E4214B /* TCPreferencesMgt */;
 		};
