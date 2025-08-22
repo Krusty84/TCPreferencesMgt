@@ -23,6 +23,36 @@ struct TCPreferencesMgtApp: App {
             CommandGroup(replacing: .importExport) {
                 OpenConnectionCommand()
             }
+            CommandGroup(replacing: .appInfo) {
+                Button("About TCPreferencesMgt") {
+                    let credits = NSMutableAttributedString(
+                        string: """
+                        Utility for real-time viewing and light management of Teamcenter system preferences (Siemens Digital Industries Software).
+                        
+                        License: MIT
+                        Author: Alexey Sedoykin
+                        Contact: www.linkedin.com/in/sedoykin
+                        """
+                    )
+
+                    // Find range of "www.linkedin.com/in/sedoykin"
+                    let contact = "www.linkedin.com/in/sedoykin"
+                    if let range = credits.string.range(of: contact) {
+                        let nsRange = NSRange(range, in: credits.string)
+                        credits.addAttributes([
+                            .link: URL(string: "https://www.linkedin.com/in/sedoykin")!,
+                            .foregroundColor: NSColor.linkColor,
+                            .underlineStyle: NSUnderlineStyle.single.rawValue
+                        ], range: nsRange)
+                    }
+
+                    NSApplication.shared.orderFrontStandardAboutPanel(
+                        options: [
+                            .credits: credits
+                        ]
+                    )
+                }
+            }
         }
 
         // Settings window (standard macOS Settings menu)

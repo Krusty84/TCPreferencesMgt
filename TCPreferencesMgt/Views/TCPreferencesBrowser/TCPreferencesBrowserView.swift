@@ -24,7 +24,7 @@ struct TCPreferencesBrowserView: View {
     }
     private enum CollectionsViewKind: String, CaseIterable, Identifiable {
         case user = "Your"
-        case recommended = "Recommended by Krusty84"
+        case recommended = "Recommended"
         var id: String { rawValue }
     }
 
