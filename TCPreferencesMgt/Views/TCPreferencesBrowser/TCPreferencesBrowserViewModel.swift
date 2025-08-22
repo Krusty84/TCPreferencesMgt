@@ -65,7 +65,19 @@ final class TCPreferencesBrowserViewModel: ObservableObject {
     @Published var collChoice: CollectionChoice = .existing
     @Published var selectedCollectionKey: String = ""
     @Published var newCollectionName: String = ""
-
+    
+    // MARK: - Predefined Collection preferences list
+    @Published var perfomanceCriticalPreferencesList: [String] = [
+        "Fms_BootStrap_Urls",
+        "Mail_OSMail_activated",
+        "Mail_server_name",
+        "Mail_server_port",
+        "ADA_enabled"
+    ]
+    //
+    @Published var uiStylesheetsPreferencesList: [String] = [
+        "RENDERING"
+    ]
     // MARK: - Status
     enum PrefStatus { case new, changed, stable, missing, unknown }
 
@@ -161,6 +173,62 @@ final class TCPreferencesBrowserViewModel: ObservableObject {
             sortBy: [SortDescriptor(\TCPreferenceCollection.name, order: .forward)]
         )
         do { collections = try context.fetch(descriptor) } catch { collections = [] }
+    }
+    
+    /// Fetch by exact names and/or substring terms (case-insensitive).
+    /// - Exact name: contains a dot, e.g. "BOMItem.SUMMARYRENDERING"
+    /// - Substring term: no dot, e.g. "RENDERING", "SUMMARYRENDERING"
+    func fetchPrefs(for namesOrTerms: [String]) -> [TCPreference] {
+        guard !namesOrTerms.isEmpty else { return [] }
+
+        // Split into exact names vs substring tokens
+        let exactNames = namesOrTerms.filter { $0.contains(".") }
+        let tokens = namesOrTerms
+            .filter { !$0.contains(".") }
+            .map { $0.lowercased() }
+            .filter { !$0.isEmpty }
+
+        var results: [TCPreference] = []
+
+        // 1) Exact-name matches via SwiftData predicate (fast and precise)
+        if !exactNames.isEmpty {
+            let set = Set(exactNames)
+            var d = FetchDescriptor<TCPreference>(
+                predicate: #Predicate { p in
+                    p.connectionID == connectionID && set.contains(p.name)
+                },
+                sortBy: [SortDescriptor(\TCPreference.name, order: .forward)]
+            )
+            if let fetched = try? context.fetch(d) {
+                results.append(contentsOf: fetched)
+            }
+        }
+
+        // 2) Substring matches (case-insensitive) — filter an in-memory pool
+        if !tokens.isEmpty {
+            // Prefer what you already loaded; otherwise fetch once for this connection
+            var pool = items
+            if pool.isEmpty {
+                var dAll = FetchDescriptor<TCPreference>(
+                    predicate: #Predicate { $0.connectionID == connectionID },
+                    sortBy: [SortDescriptor(\TCPreference.name, order: .forward)]
+                )
+                if let fetchedAll = try? context.fetch(dAll) {
+                    pool = fetchedAll
+                }
+            }
+
+            let more = pool.filter { p in
+                let n = p.name.lowercased()
+                return tokens.contains(where: { n.contains($0) })
+            }
+            results.append(contentsOf: more)
+        }
+
+        // De-duplicate (in case an item matched both exact and substring paths) and sort
+        var seen = Set<String>() // use your stable unique key
+        let unique = results.filter { seen.insert($0.key).inserted }
+        return unique.sorted { $0.name.localizedCompare($1.name) == .orderedAscending }
     }
 
     // MARK: - Status & History
