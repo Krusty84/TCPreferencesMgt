@@ -43,6 +43,13 @@ struct TCPreferencesBrowserView: View {
     private let kGap12: CGFloat = 60   // big gap between columns 1 and 2
     private let kGap23: CGFloat = 20   // small gap between columns 2 and 3
 
+    // MARK: Compare
+    @Environment(\.openWindow) private var openWindow
+    @State private var showCompareSheet = false
+
+    private func allConnections() -> [TCConnection] {
+        (try? context.fetch(FetchDescriptor<TCConnection>())) ?? []
+    }
     // MARK: Init
     init(connectionID: UUID) {
         self.connectionID = connectionID
@@ -116,7 +123,8 @@ private extension TCPreferencesBrowserView {
                 regularPreferencesList
                 footerButtons
             }
-            .contextMenu(forSelectionType: TCPreference.ID.self) { selection in
+           // .contextMenu(forSelectionType: TCPreference.ID.self) { selection in
+            .contextMenu(forSelectionType: PersistentIdentifier.self) { selection in
                 Button("Export…") { vm.exportPreferencesXML(selection: selection) }
                     .disabled(selection.isEmpty)
                 Button("Copy to clipboard…") { vm.copyPreferencesXML(selection: selection) }
@@ -127,9 +135,34 @@ private extension TCPreferencesBrowserView {
                 Divider()
                 Button("Assign to collection…") { showAssignDialog = true }
                     .disabled(selection.isEmpty)
+                Divider()
+                Button("Compare to…") {
+                       vm.compareSelection = selection
+                       showCompareSheet = true
+                }
+                .disabled(selection.isEmpty)
             }
             .sheet(isPresented: $showAssignDialog) {
                 assignCollectionSheet
+            }
+            .sheet(isPresented: $showCompareSheet) {
+                ComparePickerSheet(
+                    currentConnectionID: connectionID,
+                    allConnections: allConnections(),
+                    onCancel: { showCompareSheet = false },
+                    onChoose: { otherIDs in
+                        let names = vm.filteredItems
+                            .filter { vm.selection.contains($0.persistentModelID) }
+                            .map(\.name)
+                        let payload = CompareLaunchPayload(
+                            leftConnectionID: connectionID,
+                            rightConnectionIDs: otherIDs,
+                            preferenceNames: names
+                        )
+                        openWindow(id: "compare", value: payload)
+                        showCompareSheet = false
+                    }
+                )
             }
         }
     }
@@ -398,6 +431,51 @@ private extension TCPreferencesBrowserView {
             .frame(maxWidth: .infinity, alignment: .topLeading)
         }
         .frame(minWidth: 420, maxWidth: .infinity, maxHeight: .infinity)
+    }
+}
+
+//Compare Helper - Select another connections
+private struct ComparePickerSheet: View {
+    let currentConnectionID: UUID
+    let allConnections: [TCConnection]
+    var onCancel: () -> Void
+    var onChoose: ([UUID]) -> Void
+
+    @State private var chosen: Set<UUID> = []
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Compare to other connections").font(.headline)
+            Text("You can select two or more.").foregroundStyle(.secondary)
+
+            List(allConnections.filter { $0.id != currentConnectionID },
+                 selection: $chosen) {_ in 
+                ForEach(allConnections.filter { $0.id != currentConnectionID }) { c in
+                    HStack {
+                        VStack(alignment: .leading) {
+                            Text(c.name.isEmpty ? "(No name)" : c.name).font(.headline)
+                            Text(c.url).font(.caption).foregroundStyle(.secondary)
+                        }
+                        Spacer()
+                        Text(c.username).foregroundStyle(.secondary)
+                    }
+                    .tag(c.id as UUID)
+                    .contentShape(Rectangle())
+                }
+            }
+            .frame(width: 560, height: 280)
+
+            HStack {
+                Spacer()
+                Button("Cancel") { onCancel() }
+                Button("OK") {
+                    onChoose(Array(chosen))
+                }
+                .keyboardShortcut(.defaultAction)
+                .disabled(chosen.isEmpty)
+            }
+        }
+        .padding(16)
     }
 }
 

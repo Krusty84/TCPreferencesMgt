@@ -8,6 +8,13 @@
 import SwiftUI
 import SwiftData
 
+// Payload to launch the compare window
+struct CompareLaunchPayload: Codable, Hashable {
+    let leftConnectionID: UUID //current opened connection
+    let rightConnectionIDs: [UUID] //another connection to be compared
+    let preferenceNames: [String]
+}
+
 @main
 struct TCPreferencesMgtApp: App {
     // SwiftData container
@@ -76,6 +83,23 @@ struct TCPreferencesMgtApp: App {
             }
         }
         .modelContainer(for: [TCConnection.self, TCPreference.self])
+        
+        // Compare preferences window
+        WindowGroup("Compare", id: "compare", for: CompareLaunchPayload.self) { $payload in
+                    if let payload {
+                        CompareWindowView(payload: payload)
+                    } else {
+                        Text("Nothing to compare")
+                            .frame(minWidth: 600, minHeight: 400)
+                    }
+                }
+                .modelContainer(for: [
+                    TCConnection.self,
+                    TCPreference.self,
+                    TCPreferenceRevision.self,
+                    //TCCollection.self,
+                    //TCPreferenceCollection.self
+                ])
     }
 }
 

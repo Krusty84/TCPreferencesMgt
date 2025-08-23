@@ -23,12 +23,14 @@ final class TCPreferencesBrowserViewModel: ObservableObject {
     @Published var collections: [TCPreferenceCollection] = []
 
     // MARK: - UI State & Filters
-    @Published var selection: Set<TCPreference.ID> = [] {
-        didSet {
-            clearEditsOnSelectionChange()
-            updatePinCategory()
-        }
-    }
+//    @Published var selection: Set<TCPreference.ID> = [] {
+//        didSet {
+//            clearEditsOnSelectionChange()
+//            updatePinCategory()
+//        }
+//    }
+    @Published var selection: Set<PersistentIdentifier> = []
+    @Published var compareSelection: Set<PersistentIdentifier> = []
     @Published var nameFilter: String = ""
     @Published var selectedCategory: String = "All" { didSet { updatePinCategory() } }
     @Published var selectedScope: String = "All"
@@ -93,9 +95,14 @@ final class TCPreferencesBrowserViewModel: ObservableObject {
     }
 
     // MARK: - Derived
+//    var selectedPref: TCPreference? {
+//        guard let id = selection.first else { return nil }
+//        return items.first { $0.id == id }
+//    }
+    
     var selectedPref: TCPreference? {
         guard let id = selection.first else { return nil }
-        return items.first { $0.id == id }
+        return items.first { $0.persistentModelID == id }
     }
 
     var categories: [String] {
@@ -338,7 +345,8 @@ final class TCPreferencesBrowserViewModel: ObservableObject {
     }
 
     // MARK: - Export XML
-    func exportPreferencesXML(selection: Set<TCPreference.ID>) {
+    //func exportPreferencesXML(selection: Set<TCPreference.ID>) {
+    func exportPreferencesXML(selection: Set<PersistentIdentifier>) {
         let chosen = prefs(from: selection)
         guard !chosen.isEmpty else { return }
 
@@ -378,7 +386,8 @@ final class TCPreferencesBrowserViewModel: ObservableObject {
         }
     }
     
-    func copyPreferencesXML(selection: Set<TCPreference.ID>) {
+    //func copyPreferencesXML(selection: Set<TCPreference.ID>) {
+    func copyPreferencesXML(selection: Set<PersistentIdentifier>) {
         let chosen = prefs(from: selection)
         guard !chosen.isEmpty else { return }
         let xml = buildPreferencesXML(chosen)
@@ -421,8 +430,12 @@ final class TCPreferencesBrowserViewModel: ObservableObject {
         copyToClipboard(xml)
     }
 
-    private func prefs(from selection: Set<TCPreference.ID>) -> [TCPreference] {
-        items.filter { selection.contains($0.id) }
+//    private func prefs(from selection: Set<TCPreference.ID>) -> [TCPreference] {
+//        items.filter { selection.contains($0.id) }
+//    }
+    
+    private func prefs(from selection: Set<PersistentIdentifier>) -> [TCPreference] {
+        items.filter { selection.contains($0.persistentModelID) }
     }
     
     private func copyToClipboard(_ text: String) {
@@ -507,7 +520,8 @@ final class TCPreferencesBrowserViewModel: ObservableObject {
     }
 
     func assignSelectionToCollection() {
-        let chosenPrefs = filteredItems.filter { selection.contains($0.id) }
+       // let chosenPrefs = filteredItems.filter { selection.contains($0.id) }
+        let chosenPrefs = filteredItems.filter { selection.contains($0.persistentModelID) }
         guard !chosenPrefs.isEmpty else { return }
 
         let target: TCPreferenceCollection
