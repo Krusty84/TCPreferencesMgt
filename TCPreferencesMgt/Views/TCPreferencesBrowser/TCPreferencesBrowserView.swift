@@ -130,7 +130,7 @@ private extension TCPreferencesBrowserView {
                 Button("Copy to clipboard…") { vm.copyPreferencesXML(selection: selection) }
                     .disabled(selection.isEmpty)
                 Divider()
-                Button("Compare to...") { vm.copyPreferencesXML(selection: selection) }
+                Button("Compare to…") { showCompareSheet = true }
                     .disabled(selection.isEmpty)
                 Divider()
                 Button("Assign to collection…") { showAssignDialog = true }
@@ -839,7 +839,7 @@ private extension TCPreferencesBrowserView {
                 Button("Copy to clipboard…") { vm.copyPreferencesXML(selection: selection) }
                     .disabled(selection.isEmpty)
                 Divider()
-                Button("Compare to...") { vm.copyPreferencesXML(selection: selection) }
+                Button("Compare to…") { showCompareSheet = true }
                     .disabled(selection.isEmpty)
                 Divider()
                 Button("Assign to collection…") { showAssignDialog = true }
