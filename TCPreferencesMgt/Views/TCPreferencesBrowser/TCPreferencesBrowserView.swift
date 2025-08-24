@@ -443,25 +443,37 @@ private struct ComparePickerSheet: View {
 
     @State private var chosen: Set<UUID> = []
 
+    // de-dupe and exclude the current connection
+    private var options: [TCConnection] {
+        var seen = Set<UUID>()
+        var out: [TCConnection] = []
+        for c in allConnections where c.id != currentConnectionID {
+            if seen.insert(c.id).inserted { out.append(c) }
+        }
+        return out
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             Text("Compare to other connections").font(.headline)
-            Text("You can select two or more.").foregroundStyle(.secondary)
+            Text("You can select two or more.")
+                .foregroundStyle(.secondary)
 
-            List(allConnections.filter { $0.id != currentConnectionID },
-                 selection: $chosen) {_ in 
-                ForEach(allConnections.filter { $0.id != currentConnectionID }) { c in
-                    HStack {
-                        VStack(alignment: .leading) {
-                            Text(c.name.isEmpty ? "(No name)" : c.name).font(.headline)
-                            Text(c.url).font(.caption).foregroundStyle(.secondary)
-                        }
-                        Spacer()
-                        Text(c.username).foregroundStyle(.secondary)
+            // ✅ single data source; no nested ForEach
+            List(options, selection: $chosen) { c in
+                HStack {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(c.name.isEmpty ? "(No name)" : c.name)
+                            .font(.headline)
+                        Text(c.url)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
                     }
-                    .tag(c.id as UUID)
-                    .contentShape(Rectangle())
+                    Spacer()
+                    Text(c.username).foregroundStyle(.secondary)
                 }
+                .tag(c.id) // multi-select uses Set<UUID>
+                .contentShape(Rectangle())
             }
             .frame(width: 560, height: 280)
 
