@@ -50,6 +50,8 @@ struct CompareWindowView: View {
     @State private var leftConn: TCConnection?
     @State private var rightConns: [TCConnection] = []
     @State private var activeRightIndex: Int = 0
+    // Per-connection snapshot timestamps shown in headers
+    @State private var connSnapshotTS: [UUID: Date] = [:]
 
     // Snapshots: name -> values
     @State private var leftDB:  [String:[String]] = [:]
@@ -60,6 +62,17 @@ struct CompareWindowView: View {
     @State private var isRefreshingAllRights = false
     @State private var isRefreshingActiveRight = false
     @State private var showOnlyDiffs = true
+    @State private var leftIsFresh: Bool = false
+    @State private var rightIsFresh: [Bool] = []
+    // animated progress per column
+    @State private var leftIsUpdating: Bool = false
+    @State private var rightIsUpdating: [Bool] = []
+    private var isBusy: Bool {
+        isRefreshingLeft
+        || isRefreshingAllRights
+        || leftIsUpdating
+        || rightIsUpdating.contains(true)
+    }
 
     // Column sizing
     @State private var nameColWidth: CGFloat = 260
@@ -95,51 +108,62 @@ struct CompareWindowView: View {
     // MARK: Header
 
     private var header: some View {
-        HStack(spacing: 12) {
-            Text("Compare Preferences").font(.title3).bold()
-            Spacer()
-            Toggle("Show only differences", isOn: $showOnlyDiffs)
-                .toggleStyle(.switch)
+        VStack(spacing: 6) {
+            // Top row: title + controls
+            HStack(spacing: 12) {
+               // Text("Compare Preferences").font(.title3).bold()
+                Spacer()
+                Toggle("Show only differences", isOn: $showOnlyDiffs)
+                    .toggleStyle(.switch)
+                    .disabled(isBusy)
 
-            Divider().frame(height: 22)
+                Divider().frame(height: 22)
 
-            Button {
-                Task { await refreshLeft() }
-            } label: {
-                HStack(spacing: 6) {
-                    if isRefreshingLeft { ProgressView().controlSize(.small) }
-                    Text("Fetch Fresh (Left)")
+                // 2 buttons only
+                Button {
+                    Task { await refreshLeft() }
+                } label: {
+                    HStack(spacing: 6) {
+                        if isRefreshingLeft { ProgressView().controlSize(.small) }
+                        Text("Update Left")
+                    }
                 }
-            }
-            .buttonStyle(.bordered)
-
-            Button {
-                Task { await refreshActiveRight() }
-            } label: {
-                HStack(spacing: 6) {
-                    if isRefreshingActiveRight { ProgressView().controlSize(.small) }
-                    Text("Fetch Fresh (Right)")
+                .buttonStyle(.bordered)
+                .disabled(isBusy)
+                
+                Button {
+                    Task { await refreshAllRights() }
+                } label: {
+                    HStack(spacing: 6) {
+                        if isRefreshingAllRights { ProgressView().controlSize(.small) }
+                        Text("Update All Compared")
+                    }
                 }
+                .buttonStyle(.bordered)
+                .disabled(isBusy || rightConns.isEmpty)
             }
-            .buttonStyle(.bordered)
-            .disabled(rightConns.isEmpty)
 
-            Button {
-                Task { await refreshAllRights() }
-            } label: {
-                HStack(spacing: 6) {
-                    if isRefreshingAllRights { ProgressView().controlSize(.small) }
-                    Text("Fetch Fresh (All Rights)")
-                }
-            }
-            .buttonStyle(.bordered)
-            .disabled(rightConns.isEmpty)
         }
         .padding(.horizontal, edgeGutter)
         .padding(.vertical, 8)
         .background(.bar)
     }
 
+    private func sourceBadge(isFresh: Bool) -> some View {
+        Group {
+            if isFresh {
+                Image(systemName: "bolt.fill").foregroundStyle(.blue)
+            } else {
+                Image(systemName: "tray").foregroundStyle(.secondary)
+            }
+        }
+        .font(.caption)
+    }
+
+    private func tinySpinner() -> some View {
+        ProgressView().controlSize(.small).scaleEffect(0.7)
+    }
+    
     // MARK: Table (sticky header + scroll rows)
 
     private var table: some View {
@@ -163,24 +187,62 @@ struct CompareWindowView: View {
                 .padding(.trailing, 8)
                 .background(.thinMaterial)
 
-                // 2) Frozen: Left connection column title
-                Text(leftConnTitle).font(.headline)
-                    .frame(width: valColWidth, alignment: .leading)
-                    .padding(.vertical, 6)
-                    .background(.thinMaterial)
-
+                // 2) Frozen: Left connection column title + timestamp
+                VStack(alignment: .leading, spacing: 2) {
+                    HStack(spacing: 6) {
+                        sourceBadge(isFresh: leftIsFresh)
+                        Text(leftConnTitle)
+                            .font(.headline)
+                            .lineLimit(1).truncationMode(.tail)
+                        if leftIsUpdating { tinySpinner() }
+                    }
+                    if let leftID = leftConn?.id {
+                        Text(leftIsUpdating ? "Updating…" : tsString(connSnapshotTS[leftID]))
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
+                    }
+                }
+                .frame(width: valColWidth, alignment: .leading)
+                .padding(.vertical, 6)
+                .background(.thinMaterial)
+                .help({
+                    guard let leftID = leftConn?.id else { return leftConnTitle }
+                    let ts = connSnapshotTS[leftID]
+                    return leftIsUpdating
+                        ? "\(leftConnTitle)\nUpdating"
+                        : columnHelp(leftConnTitle, isFresh: leftIsFresh, ts: ts)
+                }())
+                
                 // 3) Scrollable: rights + Δ
                 ScrollView(.horizontal, showsIndicators: true) {
-                    HStack(alignment: .firstTextBaseline, spacing: rowHSpacing) {
+                    HStack(alignment: .top, spacing: rowHSpacing) {
                         ForEach(rightConns.indices, id: \.self) { idx in
-                            Text(rightTitle(idx)).font(.headline)
-                                .frame(width: valColWidth, alignment: .leading)
+                            let c = rightConns[idx]
+                            let name = rightTitle(idx)
+                            let isUpd = rightIsUpdating[safe: idx] ?? false
+                            VStack(alignment: .leading, spacing: 2) {
+                                HStack(spacing: 6) {
+                                    sourceBadge(isFresh: rightIsFresh[safe: idx] ?? false)
+                                    Text(name)
+                                        .font(.headline)
+                                        .lineLimit(1).truncationMode(.tail)
+                                    if isUpd { tinySpinner() }
+                                }
+                                Text(isUpd ? "Updating…" : tsString(connSnapshotTS[c.id]))
+                                    .font(.caption2)
+                                    .foregroundStyle(.secondary)
+                                    .lineLimit(1)
+                            }
+                            .frame(width: valColWidth, alignment: .leading)
+                            .help(isUpd ? "\(name)\nUpdating"
+                                        : columnHelp(name, isFresh: rightIsFresh[safe: idx] ?? false, ts: connSnapshotTS[c.id]))
+
                             Text("Δ").font(.headline)
                                 .frame(width: indColWidth, alignment: .center)
                                 .help("Status vs Left")
                         }
                     }
-                    .padding(.vertical, 6)
                 }
                 .background(.thinMaterial)
             }
@@ -368,6 +430,19 @@ struct CompareWindowView: View {
 
         leftDB  = snapshotFromDB(connID: payload.leftConnectionID, names: payload.preferenceNames)
         rightDBs = rightConns.map { snapshotFromDB(connID: $0.id, names: payload.preferenceNames) }
+        
+        // Seed header timestamps from DB
+        if let leftID = leftConn?.id {
+            connSnapshotTS[leftID] = computeSnapshotTime(for: leftID)
+        }
+        for c in rightConns {
+            connSnapshotTS[c.id] = computeSnapshotTime(for: c.id)
+        }
+        // Freshness flags
+        leftIsFresh = false
+        rightIsFresh = Array(repeating: false, count: rightConns.count)
+        leftIsUpdating = false
+        rightIsUpdating = Array(repeating: false, count: rightConns.count)
     }
 
     private func snapshotFromDB(connID: UUID, names: [String]) -> [String:[String]] {
@@ -380,7 +455,125 @@ struct CompareWindowView: View {
         for p in list { map[p.name] = p.values ?? [] }
         return map
     }
+    
+    // MARK: - Snapshot timestamps (from STORAGE)
 
+    private func snapshotTime(for connID: UUID, names: [String]) -> Date? {
+        let nameSet = Set(names)
+        let d = FetchDescriptor<TCPreference>(
+            predicate: #Predicate { $0.connectionID == connID && nameSet.contains($0.name) }
+        )
+        if let prefs = try? context.fetch(d), !prefs.isEmpty {
+            // prefer per-pref lastImportedAt (max); fall back to connection's import time
+            let maxPref = prefs.map(\.lastImportedAt).max()
+            return maxPref
+        }
+        // Fallback to connection aggregate field if you keep it
+        if let c = try? context.fetch(
+            FetchDescriptor<TCConnection>(predicate: #Predicate { $0.id == connID })
+        ).first {
+            return c.lastImportCompletedAt
+        }
+        return nil
+    }
+    
+    // Compute latest snapshot time for given connection (from DB)
+    private func computeSnapshotTime(for connID: UUID) -> Date? {
+        let nameSet = Set(payload.preferenceNames)
+        let d = FetchDescriptor<TCPreference>(
+            predicate: #Predicate { $0.connectionID == connID && nameSet.contains($0.name) }
+        )
+        if let prefs = try? context.fetch(d), !prefs.isEmpty {
+            return prefs.map(\.lastImportedAt).max()
+        }
+        if let c = try? context.fetch(FetchDescriptor<TCConnection>(
+            predicate: #Predicate { $0.id == connID })
+        ).first {
+            return c.lastImportCompletedAt
+        }
+        return nil
+    }
+
+    // Read from cache, fallback to compute-once and store
+    private func snapshotTimeCached(for connID: UUID) -> Date? {
+        if let ts = connSnapshotTS[connID] { return ts }
+        let ts = computeSnapshotTime(for: connID)
+        if let ts { connSnapshotTS[connID] = ts }
+        return ts
+    }
+
+    // Friendly string
+    private func tsString(_ date: Date?) -> String {
+        guard let d = date else { return "—" }
+        return d.formatted(date: .numeric, time: .shortened)
+    }
+
+    private func tsString(for date: Date?) -> String {
+        guard let d = date else { return "—" }
+        return d.formatted(date: .numeric, time: .shortened)
+    }
+    
+    /// Import ALL prefs from Teamcenter for a connection, then rebuild the in-memory snapshot for the names in payload.
+    @MainActor
+    private func importAndResnapshot(conn: TCConnection) async throws -> [String:[String]] {
+        _ = try await PreferencesImporter.importAll(
+            context: context,
+            connection: conn,
+            baseUrl: conn.url,
+            batchSize: 2_000
+        )
+        return snapshotFromDB(connID: conn.id, names: payload.preferenceNames)
+    }
+    
+    
+
+    
+    private func refreshLeft() async {
+        guard let l = leftConn else { return }
+        await MainActor.run {
+            isRefreshingLeft = true
+            leftIsUpdating   = true
+        }
+        do {
+            let snap = try await importAndResnapshot(conn: l)
+            await MainActor.run {
+                leftDB = snap
+                leftIsFresh = true
+                connSnapshotTS[l.id] = computeSnapshotTime(for: l.id) ?? Date()
+            }
+        } catch {
+            print("Update Left failed:", error)
+        }
+        await MainActor.run {
+            leftIsUpdating   = false
+            isRefreshingLeft = false
+        }
+    }
+
+    private func refreshAllRights() async {
+        guard !rightConns.isEmpty else { return }
+        await MainActor.run {
+            isRefreshingAllRights = true
+            rightIsUpdating = Array(repeating: true, count: rightConns.count)
+        }
+        for (idx, conn) in rightConns.enumerated() {
+            do {
+                let snap = try await importAndResnapshot(conn: conn)
+                await MainActor.run {
+                    if idx < rightDBs.count { rightDBs[idx] = snap } else { rightDBs.append(snap) }
+                    rightIsFresh[idx] = true
+                    connSnapshotTS[conn.id] = computeSnapshotTime(for: conn.id) ?? Date()
+                }
+            } catch {
+                print("Update Right[\(idx)] failed:", error)
+            }
+        }
+        await MainActor.run {
+            rightIsUpdating = Array(repeating: false, count: rightConns.count)
+            isRefreshingAllRights = false
+        }
+    }
+    
     private func fetchMap(from baseUrl: String, names: [String]) async -> [String:[String]] {
         guard let list = await TeamcenterAPIService.shared.getPreferences(
             tcEndpointUrl: APIConfig.tcGetPreferencesUrl(tcUrl: baseUrl),
@@ -393,13 +586,6 @@ struct CompareWindowView: View {
         return map
     }
 
-    private func refreshLeft() async {
-        guard let l = leftConn else { return }
-        isRefreshingLeft = true
-        leftDB = await fetchMap(from: l.url, names: payload.preferenceNames)
-        isRefreshingLeft = false
-    }
-
     private func refreshActiveRight() async {
         guard !rightConns.isEmpty, rightConns.indices.contains(activeRightIndex) else { return }
         isRefreshingActiveRight = true
@@ -407,13 +593,12 @@ struct CompareWindowView: View {
         rightDBs[activeRightIndex] = await fetchMap(from: r.url, names: payload.preferenceNames)
         isRefreshingActiveRight = false
     }
-
-    private func refreshAllRights() async {
-        guard !rightConns.isEmpty else { return }
-        isRefreshingAllRights = true
-        for (idx, conn) in rightConns.enumerated() {
-            rightDBs[idx] = await fetchMap(from: conn.url, names: payload.preferenceNames)
-        }
-        isRefreshingAllRights = false
+    
+    private func columnHelp(_ name: String, isFresh: Bool, ts: Date?) -> String {
+        let when = tsString(for: ts)
+        return isFresh
+            ? "\(name)\nUpdated from Teamcenter just now.\nSnapshot: \(when)"
+            : "\(name)\nUsing stored snapshot.\nSnapshot: \(when)"
     }
+
 }
