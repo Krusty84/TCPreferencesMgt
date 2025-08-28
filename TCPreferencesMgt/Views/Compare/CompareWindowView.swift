@@ -307,27 +307,38 @@ struct CompareWindowView: View {
 
     private var footer: some View {
         HStack(spacing: 16) {
-            // Legend
-            HStack(spacing: 10) {
-                /*
-                 if vm.isSyncing {
-                     ProgressView().controlSize(.small)
-                     Text("Syncing…").foregroundStyle(.secondary)
-                 } else if !vm.lastSyncMessage.isEmpty {
-                     Text(vm.lastSyncMessage).foregroundStyle(.secondary)
-                 } else {
-                     Text("Total preferences: \(vm.connection?.preferences.count ?? 0)")
-                         .foregroundStyle(.secondary)
-                 }
-                 */
-                let total = Set(payload.preferenceNames).count
-                let diffs = payload.preferenceNames.filter { rowHasAnyDiff(name: $0) }.count
-                Text("Total: \(total) • Differences: \(diffs)")
-                    .foregroundStyle(.secondary)
+            // Status / totals
+            Group {
+                if isRefreshingLeft {
+                    HStack(spacing: 8) {
+                        ProgressView().controlSize(.small)
+                        Text("Updating left (\(leftConnTitle))…")
+                            .foregroundStyle(.secondary)
+                    }
+                } else if isRefreshingAllRights {
+                    // how many right columns currently updating
+                    let updating = rightIsUpdating.filter { $0 }.count
+                    let totalR   = max(rightConns.count, 1)
+                    HStack(spacing: 8) {
+                        ProgressView().controlSize(.small)
+                        Text("Updating compared connections… \(updating)/\(totalR)")
+                            .foregroundStyle(.secondary)
+                    }
+                } else {
+                    let total = Set(payload.preferenceNames).count
+                    let diffs = payload.preferenceNames.filter { rowHasAnyDiff(name: $0) }.count
+                    Text("Total: \(total) • Differences: \(diffs)")
+                        .foregroundStyle(.secondary)
+                }
             }
+
             Spacer()
+
             Button("Close") { NSApplication.shared.keyWindow?.close() }
+                .disabled(isBusy) // optional: prevent closing mid-update
         }
+        .padding(.horizontal, edgeGutter)
+        .padding(.vertical, 6)
     }
 
     // MARK: Cells
