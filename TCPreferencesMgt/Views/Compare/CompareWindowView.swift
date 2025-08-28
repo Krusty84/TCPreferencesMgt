@@ -309,19 +309,23 @@ struct CompareWindowView: View {
         HStack(spacing: 16) {
             // Legend
             HStack(spacing: 10) {
-                Image(systemName: "exclamationmark.circle.fill").foregroundStyle(.orange)
-                Text("Different").foregroundStyle(.secondary)
-                Image(systemName: "checkmark.circle.fill").foregroundStyle(.green)
-                Text("Same").foregroundStyle(.secondary)
+                /*
+                 if vm.isSyncing {
+                     ProgressView().controlSize(.small)
+                     Text("Syncing…").foregroundStyle(.secondary)
+                 } else if !vm.lastSyncMessage.isEmpty {
+                     Text(vm.lastSyncMessage).foregroundStyle(.secondary)
+                 } else {
+                     Text("Total preferences: \(vm.connection?.preferences.count ?? 0)")
+                         .foregroundStyle(.secondary)
+                 }
+                 */
+                let total = Set(payload.preferenceNames).count
+                let diffs = payload.preferenceNames.filter { rowHasAnyDiff(name: $0) }.count
+                Text("Total: \(total) • Differences: \(diffs)")
+                    .foregroundStyle(.secondary)
             }
-
             Spacer()
-
-            let total = Set(payload.preferenceNames).count
-            let diffs = payload.preferenceNames.filter { rowHasAnyDiff(name: $0) }.count
-            Text("Total: \(total) • Differences: \(diffs)")
-                .foregroundStyle(.secondary)
-
             Button("Close") { NSApplication.shared.keyWindow?.close() }
         }
     }

@@ -46,3 +46,7 @@ final class TCConnection {
         
     }
 }
+enum TCImportError: Error {
+    case loginFailed
+    case fetchFailed
+}

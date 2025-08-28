@@ -19,7 +19,7 @@ class SettingsViewModel: ObservableObject {
     @Published var tcErrorMessage: String?
     @Published var preferences: [PreferenceEntry] = []
     
-    func tcLogin(tcBaseUrl: String, username: String, password: String) async {
+    func tcLogin(tcBaseUrl: String, username: String, password: String) async  {
         tcSessionId = nil
         tcResponseCode = nil
         tcErrorMessage = nil

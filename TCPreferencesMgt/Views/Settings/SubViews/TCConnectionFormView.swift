@@ -65,7 +65,7 @@ struct ConnectionFormView<RightTop: View, Footer: View>: View {
             }
             .padding(.top, 6)
         }
-        .padding(.leading, 16) // 👈 small left gap for breathing room
+        .padding(.leading, 16) // small left gap for breathing room
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 }

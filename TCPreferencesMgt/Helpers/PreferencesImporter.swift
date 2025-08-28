@@ -13,7 +13,7 @@ import TCSwiftBridge
 @MainActor
 enum PreferencesImporter {
     static let tcApi = TeamcenterAPIService.shared
-
+    static let vm4Login = SettingsViewModel()
     /// Imports all preferences for `connection` from Teamcenter and persists them in SwiftData.
     /// - Parameters:
     ///   - context: SwiftData model context
@@ -26,17 +26,28 @@ enum PreferencesImporter {
             baseUrl: String,
             batchSize: Int = 2_000
         ) async throws -> Int {
-
             // --- A) Start run window
             let runStart = Date()
             connection.lastImportStartedAt = runStart
             try? context.save()
-
+            
+           await vm4Login.tcLogin(
+                    tcBaseUrl: baseUrl,
+                    username: connection.username,
+                    password: connection.password
+                )
+            
+            guard vm4Login.tcLoginValid else {
+                    throw TCImportError.loginFailed
+            }
+            
             guard let list = await tcApi.getPreferences(
                 tcEndpointUrl: APIConfig.tcGetPreferencesUrl(tcUrl: baseUrl),
                 preferenceNames: ["*"],
                 includeDescriptions: true
-            ) else { return 0 }
+            ) else {
+                throw TCImportError.fetchFailed
+            }
 
             let sorted = list.sorted {
                 $0.definition.name.localizedCompare($1.definition.name) == .orderedAscending
@@ -180,7 +191,7 @@ enum PreferencesImporter {
             connection.lastImportCompletedAt = runEnd
 
             // Mark everything we actually saw during this run
-            var seenFetch = FetchDescriptor<TCPreference>(
+            let seenFetch = FetchDescriptor<TCPreference>(
                 predicate: #Predicate { $0.connectionID == idConst && $0.lastImportedAt >= runStart }
             )
             let seen = try context.fetch(seenFetch)

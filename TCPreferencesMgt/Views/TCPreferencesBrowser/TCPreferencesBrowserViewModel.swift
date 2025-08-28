@@ -634,7 +634,8 @@ final class TCPreferencesBrowserViewModel: ObservableObject {
                 allLoaded = false
                 loadNextBatch()
 
-                lastSyncMessage = "Synced \(processed) preferences."
+                //lastSyncMessage = "Synced \(processed) preferences."
+                lastSyncMessage = "Preferences synced."
             } catch {
                 lastSyncMessage = "Sync failed: \(error.localizedDescription)"
                 print("TC Sync error:", error)
