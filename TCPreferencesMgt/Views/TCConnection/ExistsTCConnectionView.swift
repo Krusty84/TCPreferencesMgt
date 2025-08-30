@@ -13,18 +13,28 @@ struct ExistsTCConnectionView: View {
     @Environment(\.openWindow) private var openWindow
     @Environment(\.dismiss) private var dismiss
 
-    @State private var selectionID: UUID? = nil
+    // Use UUID because TCConnection has `id: UUID`
+    @State private var selection: Set<UUID> = []
 
-    // Resolve selected connection from ID
-    private var selectedConnection: TCConnection? {
-        guard let id = selectionID else { return nil }
-        return connections.first(where: { $0.id == id })
+    // Exactly one selected
+    private var selectedOne: TCConnection? {
+        guard selection.count == 1, let uid = selection.first else { return nil }
+        return connections.first { $0.id == uid }
     }
 
-    // Can we open? Only if a connection is selected AND it has preferences
-    private var canOpen: Bool {
-        guard let conn = selectedConnection else { return false }
-        return !conn.preferences.isEmpty
+    // Keep current list order for left→right
+    private var orderedSelectedConnections: [TCConnection] {
+        connections.filter { selection.contains($0.id) }
+    }
+
+    private var canOpenSingle: Bool {
+        guard let c = selectedOne else { return false }
+        return !c.preferences.isEmpty
+    }
+
+    private var canCompare: Bool {
+        let ordered = orderedSelectedConnections
+        return ordered.count >= 2 && !ordered.first!.preferences.isEmpty
     }
 
     var body: some View {
@@ -35,15 +45,14 @@ struct ExistsTCConnectionView: View {
             Group {
                 if connections.isEmpty {
                     VStack(spacing: 12) {
-                        Text("No connections yet")
-                            .font(.title2)
+                        Text("No connections yet").font(.title2)
                         Text("Use Settings to add connections.\nUse File → Open… to choose one.")
                             .multilineTextAlignment(.center)
                             .foregroundStyle(.secondary)
                     }
                     .frame(minWidth: 520, minHeight: 320)
                 } else {
-                    List(selection: $selectionID) {
+                    List(selection: $selection) {
                         ForEach(connections) { conn in
                             HStack {
                                 VStack(alignment: .leading, spacing: 2) {
@@ -52,8 +61,8 @@ struct ExistsTCConnectionView: View {
                                             .font(.headline)
                                         if !conn.desc.isEmpty {
                                             Text("(\(conn.desc))")
-                                                .font(.caption)               // tiny font
-                                                .foregroundStyle(.secondary)  // subtle style
+                                                .font(.caption)
+                                                .foregroundStyle(.secondary)
                                         }
                                     }
                                     Text(conn.url)
@@ -61,35 +70,33 @@ struct ExistsTCConnectionView: View {
                                         .foregroundStyle(.secondary)
                                 }
                                 Spacer()
-                                VStack(alignment: .leading, spacing: 2) {
-                                    // Show how many preferences the connection has
-                                    if conn.preferences.isEmpty {
-                                        Text("No preferences (Import before open)")
-                                            .foregroundStyle(.secondary)
-                                    } else {
-                                        Text("\(conn.preferences.count) preferences")
-                                            .foregroundStyle(.secondary)
-                                    }
+                                if conn.preferences.isEmpty {
+                                    Text("No preferences (Import before open)")
+                                        .foregroundStyle(.secondary)
+                                } else {
+                                    Text("\(conn.preferences.count) preferences")
+                                        .foregroundStyle(.secondary)
                                 }
-                                
-                    
                             }
-                            .tag(conn.id)
-                            .contentShape(Rectangle())
-                            .onTapGesture {
-                                selectionID = conn.id
-                            }
+                            .tag(conn.id) // TAG WITH UUID (matches selection type)
                             .onTapGesture(count: 2) {
-                                // Only open if the connection has preferences
-                                if !conn.preferences.isEmpty {
-                                    open(conn.id)
+                                if canOpenSingle, let one = selectedOne {
+                                    openSingle(one.id)
+                                } else if canCompare {
+                                    openCompare()
                                 }
                             }
-                            .listRowBackground(
-                                (selectionID == conn.id)
-                                ? Color.accentColor.opacity(0.12)
-                                : Color.clear
-                            )
+                            .contextMenu {
+                                Button("Open") {
+                                    if canOpenSingle, let one = selectedOne {
+                                        openSingle(one.id)
+                                    }
+                                }.disabled(!canOpenSingle)
+
+                                Button("Compare…") {
+                                    if canCompare { openCompare() }
+                                }.disabled(!canCompare)
+                            }
                         }
                     }
                     .listStyle(.inset(alternatesRowBackgrounds: true))
@@ -100,19 +107,45 @@ struct ExistsTCConnectionView: View {
             HStack {
                 Spacer()
                 Button("Cancel") { dismiss() }
+
+                Button("Compare…") { openCompare() }
+                    .disabled(!canCompare)
+                    .help(canCompare ? "Compare selected connections"
+                                     : "Select at least two connections; the first must have preferences")
+
                 Button("Open") {
-                    if let id = selectionID, canOpen { open(id) }
+                    if canOpenSingle, let one = selectedOne { openSingle(one.id) }
                 }
-                //.keyboardShortcut(.defaultAction)
-                .disabled(!canOpen) // disable when none selected or no prefs
-                .help(canOpen ? "Open Preferences browser" : "This connection has no preferences yet")
+                .disabled(!canOpenSingle)
+                .help(canOpenSingle ? "Open Preferences browser"
+                                    : "Select a single connection with preferences")
             }
         }
         .padding(16)
     }
 
-    private func open(_ id: UUID) {
+    // MARK: - Actions
+
+    private func openSingle(_ id: UUID) {
         openWindow(id: "connection", value: id)
+        dismiss()
+    }
+
+    private func openCompare() {
+        let ordered = orderedSelectedConnections
+        guard ordered.count >= 2 else { return }
+        let left = ordered[0]
+        let rights = Array(ordered.dropFirst())
+
+        let names = left.preferences.map(\.name)
+            .sorted { $0.localizedCompare($1) == .orderedAscending }
+
+        let payload = CompareLaunchPayload(
+            leftConnectionID: left.id,
+            rightConnectionIDs: rights.map(\.id),
+            preferenceNames: names
+        )
+        openWindow(id: "compare", value: payload)
         dismiss()
     }
 }

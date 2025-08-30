@@ -50,6 +50,7 @@ struct CompareWindowView: View {
     @State private var leftConn: TCConnection?
     @State private var rightConns: [TCConnection] = []
     @State private var activeRightIndex: Int = 0
+    @State private var nameFilter: String = ""
     // Per-connection snapshot timestamps shown in headers
     @State private var connSnapshotTS: [UUID: Date] = [:]
 
@@ -73,15 +74,27 @@ struct CompareWindowView: View {
         || leftIsUpdating
         || rightIsUpdating.contains(true)
     }
+    @State private var lastError: String = ""
+    @State private var leftUpdateError: String? = nil
+    @State private var rightUpdateErrors: [UUID: String] = [:]
 
     // Column sizing
     @State private var nameColWidth: CGFloat = 260
     @State private var catColWidth:  CGFloat = 160
     private let valColWidth: CGFloat = 280
     private let indColWidth: CGFloat = 26
-    private let rowHSpacing: CGFloat = 6
-    private let edgeGutter: CGFloat = 6
 
+    private let edgeGutter: CGFloat = 6
+    private let headerHeight: CGFloat = 46
+    
+    private let rowHSpacing: CGFloat = 3        // was 6
+    private let headerHPad: CGFloat = 4         // was 6–8 in places
+    private let headerVPad: CGFloat = 5         // was 6
+    private let cellHPad: CGFloat   = 4         // was 6
+    private let cellVPad: CGFloat   = 3         // was 4
+    private let separatorWidth: CGFloat = 0.75  // was 1
+    
+    
     init(payload: CompareLaunchPayload) { self.payload = payload }
 
     // MARK: Body
@@ -112,6 +125,9 @@ struct CompareWindowView: View {
             // Top row: title + controls
             HStack(spacing: 12) {
                // Text("Compare Preferences").font(.title3).bold()
+                TextField("Search by name, category, or values among the loaded", text: $nameFilter)
+                    .textFieldStyle(.roundedBorder)
+                    .frame(maxWidth: 360)
                 Spacer()
                 Toggle("Show only differences", isOn: $showOnlyDiffs)
                     .toggleStyle(.switch)
@@ -164,16 +180,38 @@ struct CompareWindowView: View {
         ProgressView().controlSize(.small).scaleEffect(0.7)
     }
     
-    // MARK: Table (sticky header + scroll rows)
+    @ViewBuilder
+    private func headerStatusIcon(isUpdating: Bool, isFresh: Bool, error: String?) -> some View {
+        if isUpdating {
+            ProgressView().controlSize(.small).scaleEffect(0.7)
+        } else if let _ = error {
+            Image(systemName: "xmark.circle.fill").foregroundStyle(.red)
+        } else if isFresh {
+            Image(systemName: "checkmark.circle.fill").foregroundStyle(.green)
+        } else {
+            // neutral/initial state; keep compact
+            // Image(systemName: "tray").foregroundStyle(.secondary).opacity(0.7)
+        }
+    }
 
+    private func captionText(isUpdating: Bool, isFresh: Bool, ts: Date?, error: String?) -> (String, Color) {
+        if isUpdating { return ("Updating…", .secondary) }
+        if let e = error { return ("\(e)", .red) }
+        if isFresh { return ("Updated: " + tsString(ts), .secondary) }
+        return ("Snapshot: " + tsString(ts), .secondary)
+    }
+    
+    
+    // MARK: Table (single horizontal scrollbar at header level)
+    
     private var table: some View {
-        let allNames = Array(Set(payload.preferenceNames)).sorted { $0.localizedCompare($1) == .orderedAscending }
+        let allNames  = Array(Set(payload.preferenceNames)).sorted { $0.localizedCompare($1) == .orderedAscending }
         let shownNames = showOnlyDiffs ? allNames.filter { rowHasAnyDiff(name: $0) } : allNames
 
-        return VStack(spacing: 0) {
-            // ── HEADERS (split into 3 panes)
-            HStack(spacing: 0) {
-                // 1) Frozen: Name + Category
+        return HStack(spacing: 0) {
+            // LEFT PANE (frozen): Name, Category, Left column header + left values with single vertical scroll
+            VStack(spacing: 0) {
+                // Left headers (no horizontal scroll)
                 HStack(alignment: .firstTextBaseline, spacing: rowHSpacing) {
                     Text("Name").font(.headline)
                         .measureNameWidth { nameColWidth = max(nameColWidth, $0) }
@@ -182,79 +220,36 @@ struct CompareWindowView: View {
                     Text("Category").font(.headline)
                         .measureCategoryWidth { catColWidth = max(catColWidth, $0) }
                         .frame(width: catColWidth, alignment: .leading)
-                }
-                .padding(.vertical, 6)
-                .padding(.trailing, 8)
-                .background(.thinMaterial)
 
-                // 2) Frozen: Left connection column title + timestamp
-                VStack(alignment: .leading, spacing: 2) {
-                    HStack(spacing: 6) {
-                        sourceBadge(isFresh: leftIsFresh)
-                        Text(leftConnTitle)
-                            .font(.headline)
-                            .lineLimit(1).truncationMode(.tail)
-                        if leftIsUpdating { tinySpinner() }
-                    }
-                    if let leftID = leftConn?.id {
-                        Text(leftIsUpdating ? "Updating…" : tsString(connSnapshotTS[leftID]))
-                            .font(.caption2)
-                            .foregroundStyle(.secondary)
-                            .lineLimit(1)
-                    }
-                }
-                .frame(width: valColWidth, alignment: .leading)
-                .padding(.vertical, 6)
-                .background(.thinMaterial)
-                .help({
-                    guard let leftID = leftConn?.id else { return leftConnTitle }
-                    let ts = connSnapshotTS[leftID]
-                    return leftIsUpdating
-                        ? "\(leftConnTitle)\nUpdating"
-                        : columnHelp(leftConnTitle, isFresh: leftIsFresh, ts: ts)
-                }())
-                
-                // 3) Scrollable: rights + Δ
-                ScrollView(.horizontal, showsIndicators: true) {
-                    HStack(alignment: .top, spacing: rowHSpacing) {
-                        ForEach(rightConns.indices, id: \.self) { idx in
-                            let c = rightConns[idx]
-                            let name = rightTitle(idx)
-                            let isUpd = rightIsUpdating[safe: idx] ?? false
-                            VStack(alignment: .leading, spacing: 2) {
-                                HStack(spacing: 6) {
-                                    sourceBadge(isFresh: rightIsFresh[safe: idx] ?? false)
-                                    Text(name)
-                                        .font(.headline)
-                                        .lineLimit(1).truncationMode(.tail)
-                                    if isUpd { tinySpinner() }
-                                }
-                                Text(isUpd ? "Updating…" : tsString(connSnapshotTS[c.id]))
-                                    .font(.caption2)
-                                    .foregroundStyle(.secondary)
-                                    .lineLimit(1)
-                            }
-                            .frame(width: valColWidth, alignment: .leading)
-                            .help(isUpd ? "\(name)\nUpdating"
-                                        : columnHelp(name, isFresh: rightIsFresh[safe: idx] ?? false, ts: connSnapshotTS[c.id]))
-
-                            Text("Δ").font(.headline)
-                                .frame(width: indColWidth, alignment: .center)
-                                .help("Status vs Left")
+                    // Left connection title + timestamp (stays frozen)
+                    VStack(alignment: .leading, spacing: 2){
+                        HStack(spacing: 6) {
+                            sourceBadge(isFresh: leftIsFresh)
+                            Text(leftConnTitle).font(.headline).lineLimit(1).truncationMode(.tail)
+                            if leftIsUpdating { tinySpinner() }
+                        }
+                        if let leftID = leftConn?.id {
+                            Text(leftIsUpdating ? "Updating…" : tsString(connSnapshotTS[leftID]))
+                                .font(.caption2).foregroundStyle(.secondary).lineLimit(1)
                         }
                     }
+                    .frame(width: valColWidth, alignment: .leading)
+                    .help({
+                        guard let leftID = leftConn?.id else { return leftConnTitle }
+                        return leftIsUpdating
+                            ? "\(leftConnTitle)\nUpdating"
+                            : columnHelp(leftConnTitle, isFresh: leftIsFresh, ts: connSnapshotTS[leftID])
+                    }())
                 }
+                .padding(.vertical, 6)
                 .background(.thinMaterial)
-            }
 
-            Divider()
+                Divider()
 
-            // ── ROWS (shared vertical scroll; left/middle frozen, right scrollable)
-            ScrollView(.vertical) {
-                LazyVStack(spacing: 0) {
-                    ForEach(Array(shownNames.enumerated()), id: \.offset) { (rowIndex, n) in
-                        HStack(spacing: 0) {
-                            // 1) Frozen cells: Name + Category
+                // Left rows (vertical scroll only)
+                ScrollView(.vertical) {
+                    LazyVStack(spacing: 0) {
+                        ForEach(Array(shownNames.enumerated()), id: \.offset) { (rowIndex, n) in
                             HStack(alignment: .top, spacing: rowHSpacing) {
                                 Text(n)
                                     .textSelection(.enabled)
@@ -267,19 +262,64 @@ struct CompareWindowView: View {
                                     .lineLimit(1).truncationMode(.tail)
                                     .measureCategoryWidth { catColWidth = max(catColWidth, $0) }
                                     .frame(width: catColWidth, alignment: .leading)
+
+                                valueDiffCell(left: leftDB[n], right: nil)
+                                    .frame(width: valColWidth, alignment: .leading)
                             }
                             .padding(.vertical, 6)
-                            .padding(.trailing, 8)
                             .background(rowIndex.isMultiple(of: 2) ? Color.clear : Color.gray.opacity(0.04))
 
-                            // 2) Frozen cell: Left connection value
-                            valueDiffCell(left: leftDB[n], right: nil)
-                                .frame(width: valColWidth, alignment: .leading)
-                                .padding(.vertical, 6)
-                                .background(rowIndex.isMultiple(of: 2) ? Color.clear : Color.gray.opacity(0.04))
+                            Divider().opacity(0.15)
+                        }
+                    }
+                }
+            }
 
-                            // 3) Scrollable cells: each Right value + Δ
-                            ScrollView(.horizontal, showsIndicators: false) {
+            // Vertical separator between frozen and scrolling panes
+            Rectangle()
+                .fill(Color.gray.opacity(0.25))
+                .frame(width: 1)
+
+            // RIGHT PANE: one Horizontal ScrollView that hosts BOTH the header captions and the right-side rows,
+            //              so you get a single horizontal scrollbar at the header level.
+            ScrollView(.horizontal, showsIndicators: true) {
+                VStack(spacing: 0) {
+                    // Right headers (inside the same horizontal scroller)
+                    HStack(alignment: .firstTextBaseline, spacing: rowHSpacing) {
+                        ForEach(rightConns.indices, id: \.self) { idx in
+                            let c = rightConns[idx]
+                            let name = rightTitle(idx)
+                            let isUpd = rightIsUpdating[safe: idx] ?? false
+
+                            VStack(alignment: .leading, spacing: 2) {
+                                HStack(spacing: 6) {
+                                    sourceBadge(isFresh: rightIsFresh[safe: idx] ?? false)
+                                    Text(name).font(.headline).lineLimit(1).truncationMode(.tail)
+                                    if isUpd { tinySpinner() }
+                                }
+                                Text(isUpd ? "Updating…" : tsString(connSnapshotTS[c.id]))
+                                    .font(.caption2).foregroundStyle(.secondary).lineLimit(1)
+                            }
+                            .frame(width: valColWidth, alignment: .leading)
+                            .help(isUpd
+                                  ? "\(name)\nUpdating"
+                                  : columnHelp(name, isFresh: rightIsFresh[safe: idx] ?? false,
+                                               ts: connSnapshotTS[c.id]))
+
+                            Text("Δ").font(.headline)
+                                .frame(width: indColWidth, alignment: .center)
+                                .help("Status vs Left")
+                        }
+                    }
+                    .padding(.vertical, 6)
+                    .background(.thinMaterial)
+
+                    Divider()
+
+                    // Right rows (vertical scroll INSIDE the same horizontal scroller)
+                    ScrollView(.vertical, showsIndicators: true) {
+                        LazyVStack(spacing: 0) {
+                            ForEach(Array(shownNames.enumerated()), id: \.offset) { (rowIndex, n) in
                                 HStack(alignment: .top, spacing: rowHSpacing) {
                                     ForEach(rightConns.indices, id: \.self) { idx in
                                         let r = rightDBs[safe: idx]?[n]
@@ -292,15 +332,15 @@ struct CompareWindowView: View {
                                 }
                                 .padding(.vertical, 6)
                                 .background(rowIndex.isMultiple(of: 2) ? Color.clear : Color.gray.opacity(0.04))
+
+                                Divider().opacity(0.15)
                             }
                         }
-
-                        Divider().opacity(0.15)
                     }
                 }
             }
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading) // left-aligned
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
     }
 
     // MARK: Footer
@@ -309,14 +349,17 @@ struct CompareWindowView: View {
         HStack(spacing: 16) {
             // Status / totals
             Group {
-                if isRefreshingLeft {
+                if !lastError.isEmpty {
+                    Text(lastError)
+                        .foregroundStyle(.red)
+                        .lineLimit(2)
+                } else if isRefreshingLeft {
                     HStack(spacing: 8) {
                         ProgressView().controlSize(.small)
                         Text("Updating left (\(leftConnTitle))…")
                             .foregroundStyle(.secondary)
                     }
                 } else if isRefreshingAllRights {
-                    // how many right columns currently updating
                     let updating = rightIsUpdating.filter { $0 }.count
                     let totalR   = max(rightConns.count, 1)
                     HStack(spacing: 8) {
@@ -335,7 +378,7 @@ struct CompareWindowView: View {
             Spacer()
 
             Button("Close") { NSApplication.shared.keyWindow?.close() }
-                .disabled(isBusy) // optional: prevent closing mid-update
+                .disabled(isBusy)
         }
         .padding(.horizontal, edgeGutter)
         .padding(.vertical, 6)
@@ -347,21 +390,23 @@ struct CompareWindowView: View {
     private func valueDiffCell(left: [String]?, right: [String]?) -> some View {
         let show = right ?? left
         let joined = (show?.isEmpty ?? true) ? "—" : show!.joined(separator: ", ")
-        let isDifferent: Bool = { guard let r = right else { return false }; return decideStatus(left: left, right: r) != .same }()
+        let isDifferent: Bool = { guard let r = right else { return false }
+            return decideStatus(left: left, right: r) != .same
+        }()
 
         Text(joined)
             .textSelection(.enabled)
             .lineLimit(2)
             .truncationMode(.tail)
-            .padding(.vertical, 4)
-            .padding(.horizontal, 6)
+            .padding(.vertical, cellVPad)      // tighter
+            .padding(.horizontal, cellHPad)    // tighter
             .background(
                 RoundedRectangle(cornerRadius: 6)
                     .fill(isDifferent ? Color.orange.opacity(0.12) : Color.clear)
             )
             .overlay(
                 RoundedRectangle(cornerRadius: 6)
-                    .stroke(isDifferent ? Color.orange.opacity(0.35) : Color.clear, lineWidth: 1)
+                    .stroke(isDifferent ? Color.orange.opacity(0.30) : Color.clear, lineWidth: 1)
             )
             .help(joined)
     }
@@ -380,7 +425,39 @@ struct CompareWindowView: View {
     }
 
     private enum RowStatus { case same, different, onlyLeft, onlyRight }
-
+    
+    // MARK: Columns
+    
+    @ViewBuilder
+    private func valueHeader(
+        title: String,
+        timestamp: Date?,
+        isFresh: Bool,
+        isUpdating: Bool,
+        width: CGFloat
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 2) {
+            HStack(spacing: 6) {
+                Image(systemName: isFresh ? "bolt.fill" : "tray")
+                    .font(.caption)
+                    .foregroundStyle(isFresh ? .blue : .secondary)
+                Text(title)
+                    .font(.headline)
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+                if isUpdating {
+                    ProgressView().controlSize(.small).scaleEffect(0.75)
+                }
+            }
+            Text(isUpdating ? "Updating…" :
+                 (timestamp.map { $0.formatted(date: .numeric, time: .shortened) } ?? "—"))
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+        }
+        .frame(width: width, alignment: .leading)
+    }
+    
     // MARK: Data helpers
 
     private var leftConnTitle: String {
@@ -431,6 +508,29 @@ struct CompareWindowView: View {
         default:         return (left == right) ? .same : .different
         }
     }
+    
+    private func matchesSearch(_ name: String) -> Bool {
+        let raw = nameFilter.trimmingCharacters(in: .whitespacesAndNewlines)
+        if raw.isEmpty { return true }
+
+        let tokens = raw.lowercased()
+            .split(whereSeparator: { $0.isWhitespace })
+            .map(String.init)
+
+        // Gather haystack: name + category + left values + all right values
+        let cat = category(for: name)
+        let leftVals = (leftDB[name] ?? []).joined(separator: " ")
+        let rightValsJoined = rightConns.indices.compactMap { idx in
+            rightDBs[safe: idx]?[name]?.joined(separator: " ")
+        }.joined(separator: " ")
+
+        let haystack = [name, cat, leftVals, rightValsJoined]
+            .joined(separator: " ")
+            .lowercased()
+
+        // AND semantics like your other view
+        return tokens.allSatisfy { haystack.contains($0) }
+    }
 
     // MARK: Load & refresh
 
@@ -469,6 +569,14 @@ struct CompareWindowView: View {
         var map: [String:[String]] = [:]
         for p in list { map[p.name] = p.values ?? [] }
         return map
+    }
+    
+    private func readableUpdateError(_ error: Error) -> String {
+        let msg = error.localizedDescription.lowercased()
+        if msg.contains("login") || msg.contains("auth") || msg.contains("unauthoriz") {
+            return "Login failed"
+        }
+        return "Fetch data failed"
     }
     
     // MARK: - Snapshot timestamps (from STORAGE)
@@ -540,14 +648,12 @@ struct CompareWindowView: View {
         return snapshotFromDB(connID: conn.id, names: payload.preferenceNames)
     }
     
-    
-
-    
     private func refreshLeft() async {
         guard let l = leftConn else { return }
         await MainActor.run {
             isRefreshingLeft = true
             leftIsUpdating   = true
+            leftUpdateError  = nil
         }
         do {
             let snap = try await importAndResnapshot(conn: l)
@@ -555,9 +661,14 @@ struct CompareWindowView: View {
                 leftDB = snap
                 leftIsFresh = true
                 connSnapshotTS[l.id] = computeSnapshotTime(for: l.id) ?? Date()
+                leftUpdateError = nil
             }
         } catch {
             print("Update Left failed:", error)
+            await MainActor.run {
+                leftUpdateError = readableUpdateError(error)
+                leftIsFresh = false
+            }
         }
         await MainActor.run {
             leftIsUpdating   = false
@@ -570,6 +681,7 @@ struct CompareWindowView: View {
         await MainActor.run {
             isRefreshingAllRights = true
             rightIsUpdating = Array(repeating: true, count: rightConns.count)
+            for c in rightConns { rightUpdateErrors[c.id] = nil }
         }
         for (idx, conn) in rightConns.enumerated() {
             do {
@@ -578,9 +690,14 @@ struct CompareWindowView: View {
                     if idx < rightDBs.count { rightDBs[idx] = snap } else { rightDBs.append(snap) }
                     rightIsFresh[idx] = true
                     connSnapshotTS[conn.id] = computeSnapshotTime(for: conn.id) ?? Date()
+                    rightUpdateErrors[conn.id] = nil
                 }
             } catch {
                 print("Update Right[\(idx)] failed:", error)
+                await MainActor.run {
+                    rightIsFresh[idx] = false
+                    rightUpdateErrors[conn.id] = readableUpdateError(error)
+                }
             }
         }
         await MainActor.run {
@@ -617,3 +734,4 @@ struct CompareWindowView: View {
     }
 
 }
+
