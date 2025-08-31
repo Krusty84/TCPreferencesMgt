@@ -25,36 +25,18 @@ class SettingsViewModel: ObservableObject {
         tcErrorMessage = nil
         isLoading = true
         
-        let sessionId = await tcApi.tcLogin(
-            tcEndpointUrl: APIConfig.tcLoginUrl(tcUrl: tcBaseUrl),
-            userName: username,
-            userPassword: password
-        )
         
-        guard let validSession = sessionId else {
-            isLoading = false
-            tcResponseCode = 401
-            tcErrorMessage = "Teamcenter login failed"
-            //LoggerHelper.error("TC login failed; no JSESSIONID returned.")
-            return
-        }
-        
-        tcSessionId = validSession
-        
-        if (await tcApi.getTcSessionInfo(
-            tcEndpointUrl: APIConfig.tcSessionInfoUrl(tcUrl: tcBaseUrl)
-        )) != nil {
+        let result = await tcApi.tcLoginGetSession(tcUrl: tcBaseUrl, username: username, password: password)
+        if(result.code == 200){
             tcResponseCode = 200
             isLoading = false
             tcLoginValid = true
-        } else {
-            tcResponseCode = 200
-            tcErrorMessage = "Could not fetch session info"
+        } else if (result.code == 400){
+            tcResponseCode = 400
             isLoading = false
             tcLoginValid = false
-            //LoggerHelper.error("getSessionInfo returned nil")
         }
-    
+            
     }
     
     func importTCPreferences(tcBaseUrl: String) async {
@@ -62,11 +44,8 @@ class SettingsViewModel: ObservableObject {
         tcErrorMessage = nil
         isLoading = true
         
-        if let list = await tcApi.getPreferences(
-            tcEndpointUrl: APIConfig.tcGetPreferencesUrl(tcUrl: tcBaseUrl),
-            preferenceNames:["*"],
-            includeDescriptions: true
-        ){
+        if let list = await tcApi.getRefreshedPreferences(tcUrl:tcBaseUrl)
+        {
             preferences = list.sorted { $0.definition.name.localizedCompare($1.definition.name) == .orderedAscending }
            
         } else {

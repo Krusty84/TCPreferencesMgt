@@ -41,11 +41,8 @@ enum PreferencesImporter {
                     throw TCImportError.loginFailed
             }
             
-            guard let list = await tcApi.getPreferences(
-                tcEndpointUrl: APIConfig.tcGetPreferencesUrl(tcUrl: baseUrl),
-                preferenceNames: ["*"],
-                includeDescriptions: true
-            ) else {
+            guard let list = await tcApi.getRefreshedPreferences(tcUrl: baseUrl)
+            else {
                 throw TCImportError.fetchFailed
             }
 

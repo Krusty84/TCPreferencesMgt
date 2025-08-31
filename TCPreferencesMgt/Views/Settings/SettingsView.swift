@@ -114,7 +114,7 @@ struct SettingsView: View {
             } else {
                 ConnectionFormView(
                     title: "New Connection",
-                    b: .init(
+                    connBind: .init(
                         name: $draft.name,
                         url: $draft.url,
                         desc: $draft.desc,

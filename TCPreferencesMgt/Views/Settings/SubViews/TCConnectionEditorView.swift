@@ -27,7 +27,7 @@ struct TCConnectionEditorView: View {
     var body: some View {
         ConnectionFormView(
             title: "Edit Connection",
-            b: .init(
+            connBind: .init(
                 name: $connection.name,
                 url: $connection.url,
                 desc: $connection.desc,
@@ -105,7 +105,7 @@ struct TCConnectionEditorView: View {
                     baseUrl: connection.url,
                     batchSize: 2_000
                 )
-                alertMessage = "Imported \(imported) preferences."
+                alertMessage = "Preferences imported successfully"
             } catch {
                 alertMessage = "Import failed: \(error.localizedDescription)"
             }
@@ -142,7 +142,7 @@ struct TCConnectionEditorView: View {
     private func tcStatusMessage(for code: Int) -> String {
         switch code {
         case 200: return "OK"
-        case 401: return "Unauthorized"
+        case 400: return "Unauthorized"
         default:  return "HTTP \(code)"
         }
     }

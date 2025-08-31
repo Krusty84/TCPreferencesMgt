@@ -584,7 +584,7 @@ final class TCPreferencesBrowserViewModel: ObservableObject {
         do {
             try context.save()
         } catch {
-            print("❌ Failed to assign prefs to collection: \(error)")
+            print("Failed to assign prefs to collection: \(error)")
         }
         refreshCollections()
     }
@@ -609,7 +609,7 @@ final class TCPreferencesBrowserViewModel: ObservableObject {
                 context.delete(link)
             }
         }
-        do { try context.save() } catch { print("❌ Remove from collection failed:", error) }
+        do { try context.save() } catch { print("Remove from collection failed:", error) }
         refreshCollections()
     }
 

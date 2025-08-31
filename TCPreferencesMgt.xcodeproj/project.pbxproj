@@ -7,7 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		3D4293092E4B797A00E4214B /* TCSwiftBridge in Frameworks */ = {isa = PBXBuildFile; productRef = 3D4293082E4B797A00E4214B /* TCSwiftBridge */; };
+		3D7C08762E648A1600429150 /* TCSwiftBridge in Frameworks */ = {isa = PBXBuildFile; productRef = 3D7C08752E648A1600429150 /* TCSwiftBridge */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -40,7 +40,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				3D4293092E4B797A00E4214B /* TCSwiftBridge in Frameworks */,
+				3D7C08762E648A1600429150 /* TCSwiftBridge in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -83,7 +83,7 @@
 			);
 			name = TCPreferencesMgt;
 			packageProductDependencies = (
-				3D4293082E4B797A00E4214B /* TCSwiftBridge */,
+				3D7C08752E648A1600429150 /* TCSwiftBridge */,
 			);
 			productName = TCPreferencesMgt;
 			productReference = 3D4292682E4B6D4500E4214B /* TCPreferencesMgt.app */;
@@ -114,7 +114,7 @@
 			mainGroup = 3D42925F2E4B6D4500E4214B;
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
-				3D4293072E4B797A00E4214B /* XCRemoteSwiftPackageReference "TCSwiftBridge" */,
+				3D7C08742E648A1600429150 /* XCRemoteSwiftPackageReference "TCSwiftBridge" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 3D4292692E4B6D4500E4214B /* Products */;
@@ -163,6 +163,7 @@
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = TCPreferencesMgt/Info.plist;
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.business";
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -184,7 +185,7 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = YES;
 				CODE_SIGN_ENTITLEMENTS = TCPreferencesMgt/TCPreferencesMgtRelease.entitlements;
-				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "Apple Development";
+				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "-";
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
 				CURRENT_PROJECT_VERSION = 1;
@@ -193,6 +194,7 @@
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = TCPreferencesMgt/Info.plist;
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.business";
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -351,7 +353,7 @@
 /* End XCConfigurationList section */
 
 /* Begin XCRemoteSwiftPackageReference section */
-		3D4293072E4B797A00E4214B /* XCRemoteSwiftPackageReference "TCSwiftBridge" */ = {
+		3D7C08742E648A1600429150 /* XCRemoteSwiftPackageReference "TCSwiftBridge" */ = {
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://github.com/Krusty84/TCSwiftBridge";
 			requirement = {
@@ -362,9 +364,9 @@
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
-		3D4293082E4B797A00E4214B /* TCSwiftBridge */ = {
+		3D7C08752E648A1600429150 /* TCSwiftBridge */ = {
 			isa = XCSwiftPackageProductDependency;
-			package = 3D4293072E4B797A00E4214B /* XCRemoteSwiftPackageReference "TCSwiftBridge" */;
+			package = 3D7C08742E648A1600429150 /* XCRemoteSwiftPackageReference "TCSwiftBridge" */;
 			productName = TCSwiftBridge;
 		};
 /* End XCSwiftPackageProductDependency section */

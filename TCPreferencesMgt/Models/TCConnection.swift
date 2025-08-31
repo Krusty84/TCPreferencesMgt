@@ -46,7 +46,16 @@ final class TCConnection {
         
     }
 }
-enum TCImportError: Error {
+enum TCImportError: Error, LocalizedError {
     case loginFailed
     case fetchFailed
+
+    var errorDescription: String? {
+        switch self {
+        case .loginFailed:
+            return "Login failed"
+        case .fetchFailed:
+            return "Failed to fetch preferences"
+        }
+    }
 }

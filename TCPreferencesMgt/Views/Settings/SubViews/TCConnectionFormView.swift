@@ -6,23 +6,21 @@
 //
 
 import SwiftUI
-
-/// A small helper to pass a group of bindings
-struct ConnectionBindings {
-    var name: Binding<String>
-    var url: Binding<String>
-    var desc: Binding<String>
-    var username: Binding<String>
-    var password: Binding<String>
-}
+import Combine
 
 struct ConnectionFormView<RightTop: View, Footer: View>: View {
     let title: String
-    let b: ConnectionBindings
+    let connBind: ConnectionBindings
     @ViewBuilder var rightTop: () -> RightTop
     @ViewBuilder var footer: () -> Footer
 
     private let labelWidth: CGFloat = 80   // label width
+
+    // Проверка валидности URL
+    private var isValidTCURL: Bool {
+        let pattern = #"^https?://(?:(?:\d{1,3}\.){3}\d{1,3}|(?:[A-Za-z0-9]+\.)*[A-Za-z0-9]+):\d{1,5}/[A-Za-z0-9]+$"#
+        return connBind.url.wrappedValue.range(of: pattern, options: .regularExpression) != nil
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -32,26 +30,40 @@ struct ConnectionFormView<RightTop: View, Footer: View>: View {
             Grid(alignment: .leading, horizontalSpacing: 12, verticalSpacing: 8) {
                 GridRow {
                     Text("Name").frame(width: labelWidth, alignment: .trailing)
-                    TextField("", text: b.name)
+                    TextField("", text: connBind.name)
                         .textFieldStyle(.roundedBorder)
                 }
                 GridRow {
                     Text("TC URL").frame(width: labelWidth, alignment: .trailing)
-                    TextField("", text: b.url)
-                        .textFieldStyle(.roundedBorder)
+                    VStack(alignment: .leading, spacing: 4) {
+                            TextField("http(s)://ip-or-name-tc-webtier:port/webtier-name-typically tc", text: connBind.url)
+                                .textFieldStyle(.roundedBorder)
+                                .onReceive(Just(connBind.url.wrappedValue)) { newValue in
+                                    let filtered = newValue.unicodeScalars.filter { allowedUrlCharacters.contains($0) }
+                                    let clean = String(filtered)
+                                    if clean != newValue {
+                                        connBind.url.wrappedValue = clean
+                                    }
+                                }
+                            if !connBind.url.wrappedValue.isEmpty && !isValidTCURL {
+                                Text("⚠️ Must be http://…:port/… or https://…:port/…")
+                                    .font(.footnote)
+                                    .foregroundColor(.red)
+                            }
+                        }
                 }
                 GridRow {
                     Text("Description").frame(width: labelWidth, alignment: .trailing)
-                    TextField("", text: b.desc)
+                    TextField("", text: connBind.desc)
                         .textFieldStyle(.roundedBorder)
                 }
                 GridRow {
                     Text("Username").frame(width: labelWidth, alignment: .trailing)
                     HStack(spacing: 10) {
-                        TextField("", text: b.username)
+                        TextField("", text: connBind.username)
                             .textFieldStyle(.roundedBorder)
                             .frame(minWidth: 140)
-                        SecureField("", text: b.password)
+                        SecureField("", text: connBind.password)
                             .textFieldStyle(.roundedBorder)
                             .frame(minWidth: 140)
                         rightTop()
@@ -69,3 +81,19 @@ struct ConnectionFormView<RightTop: View, Footer: View>: View {
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 }
+
+/// A small helper to pass a group of bindings
+struct ConnectionBindings {
+    var name: Binding<String>
+    var url: Binding<String>
+    var desc: Binding<String>
+    var username: Binding<String>
+    var password: Binding<String>
+}
+
+let allowedUrlCharacters = CharacterSet(charactersIn:
+    "abcdefghijklmnopqrstuvwxyz" +
+    "ABCDEFGHIJKLMNOPQRSTUVWXYZ" +
+    "0123456789" +
+    "-._~:/?#[]@!$&'()*+,;=%"
+)
