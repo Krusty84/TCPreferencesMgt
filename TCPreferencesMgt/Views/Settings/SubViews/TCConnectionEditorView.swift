@@ -47,7 +47,7 @@ struct TCConnectionEditorView: View {
                     .frame(minWidth: 70)
                 }
             },
-            footer: {   // Save / Delete / Import Buttons
+            footer: { isValidTCURL in  // Save / Delete / Import Buttons
                 HStack {
                     Spacer()   // pushes everything to the right
 
@@ -70,7 +70,7 @@ struct TCConnectionEditorView: View {
                         Button("Save Changes") { try? context.save() }
                             .keyboardShortcut(.defaultAction)
                             .help("Save changes")
-                            .disabled(isBusy || connection.name.trimmed.isEmpty || connection.url.trimmed.isEmpty)
+                            .disabled(isBusy || connection.name.trimmed.isEmpty || connection.url.trimmed.isEmpty || !isValidTCURL)
                     }
                 }
                 .padding(.top, 6)

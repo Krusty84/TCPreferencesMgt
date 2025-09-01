@@ -8,6 +8,7 @@
 
 /* Begin PBXBuildFile section */
 		3D7C08762E648A1600429150 /* TCSwiftBridge in Frameworks */ = {isa = PBXBuildFile; productRef = 3D7C08752E648A1600429150 /* TCSwiftBridge */; };
+		3D7C08F92E6601AA00429150 /* LoggerHelper in Frameworks */ = {isa = PBXBuildFile; productRef = 3D7C08F82E6601AA00429150 /* LoggerHelper */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -40,6 +41,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				3D7C08F92E6601AA00429150 /* LoggerHelper in Frameworks */,
 				3D7C08762E648A1600429150 /* TCSwiftBridge in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -84,6 +86,7 @@
 			name = TCPreferencesMgt;
 			packageProductDependencies = (
 				3D7C08752E648A1600429150 /* TCSwiftBridge */,
+				3D7C08F82E6601AA00429150 /* LoggerHelper */,
 			);
 			productName = TCPreferencesMgt;
 			productReference = 3D4292682E4B6D4500E4214B /* TCPreferencesMgt.app */;
@@ -115,6 +118,7 @@
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
 				3D7C08742E648A1600429150 /* XCRemoteSwiftPackageReference "TCSwiftBridge" */,
+				3D7C08F72E6601AA00429150 /* XCRemoteSwiftPackageReference "LoggerHelper" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 3D4292692E4B6D4500E4214B /* Products */;
@@ -361,6 +365,14 @@
 				kind = branch;
 			};
 		};
+		3D7C08F72E6601AA00429150 /* XCRemoteSwiftPackageReference "LoggerHelper" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/Krusty84/LoggerHelper";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 1.0.0;
+			};
+		};
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
@@ -368,6 +380,11 @@
 			isa = XCSwiftPackageProductDependency;
 			package = 3D7C08742E648A1600429150 /* XCRemoteSwiftPackageReference "TCSwiftBridge" */;
 			productName = TCSwiftBridge;
+		};
+		3D7C08F82E6601AA00429150 /* LoggerHelper */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 3D7C08F72E6601AA00429150 /* XCRemoteSwiftPackageReference "LoggerHelper" */;
+			productName = LoggerHelper;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

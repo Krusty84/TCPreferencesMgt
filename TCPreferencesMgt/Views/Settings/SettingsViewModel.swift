@@ -8,6 +8,7 @@
 import Foundation
 import Combine
 import TCSwiftBridge
+import LoggerHelper
 
 @MainActor
 class SettingsViewModel: ObservableObject {
@@ -18,6 +19,14 @@ class SettingsViewModel: ObservableObject {
     @Published var tcResponseCode: Int?
     @Published var tcErrorMessage: String?
     @Published var preferences: [PreferenceEntry] = []
+    
+    @Published var appLoggingEnabled: Bool {
+        didSet { SettingsManager.shared.appLoggingEnabled = appLoggingEnabled }
+    }
+    
+    init() {
+        self.appLoggingEnabled = SettingsManager.shared.appLoggingEnabled
+    }
     
     func tcLogin(tcBaseUrl: String, username: String, password: String) async  {
         tcSessionId = nil
@@ -36,7 +45,7 @@ class SettingsViewModel: ObservableObject {
             isLoading = false
             tcLoginValid = false
         }
-            
+        
     }
     
     func importTCPreferences(tcBaseUrl: String) async {
@@ -47,7 +56,7 @@ class SettingsViewModel: ObservableObject {
         if let list = await tcApi.getRefreshedPreferences(tcUrl:tcBaseUrl)
         {
             preferences = list.sorted { $0.definition.name.localizedCompare($1.definition.name) == .orderedAscending }
-           
+            
         } else {
             preferences = []
         }

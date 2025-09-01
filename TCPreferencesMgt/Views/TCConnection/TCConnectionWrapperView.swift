@@ -7,6 +7,7 @@
 
 import SwiftUI
 import SwiftData
+import LoggerHelper
 
 struct TCConnectionWrapperView: View {
     let connectionID: UUID
@@ -50,7 +51,7 @@ struct TCConnectionWrapperView: View {
            do {
                connection = try context.fetch(d).first
            } catch {
-               print("Fetch connection error:", error)
+               LoggerHelper.error("Fetch connection error: \(error)")
            }
        }
    }

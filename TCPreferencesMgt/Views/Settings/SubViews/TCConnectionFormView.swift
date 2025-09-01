@@ -12,11 +12,10 @@ struct ConnectionFormView<RightTop: View, Footer: View>: View {
     let title: String
     let connBind: ConnectionBindings
     @ViewBuilder var rightTop: () -> RightTop
-    @ViewBuilder var footer: () -> Footer
+    @ViewBuilder var footer: (_ isValidTCURL: Bool) -> Footer
 
     private let labelWidth: CGFloat = 80   // label width
 
-    // Проверка валидности URL
     private var isValidTCURL: Bool {
         let pattern = #"^https?://(?:(?:\d{1,3}\.){3}\d{1,3}|(?:[A-Za-z0-9]+\.)*[A-Za-z0-9]+):\d{1,5}/[A-Za-z0-9]+$"#
         return connBind.url.wrappedValue.range(of: pattern, options: .regularExpression) != nil
@@ -73,7 +72,7 @@ struct ConnectionFormView<RightTop: View, Footer: View>: View {
             }
 
             HStack(spacing: 10) {
-                footer()
+                footer(isValidTCURL)
             }
             .padding(.top, 6)
         }

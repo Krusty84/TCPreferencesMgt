@@ -1,6 +1,15 @@
 {
-  "originHash" : "2245ae39ad70f6df8b473e9d2f49bc9ff5285e407d3be24c0448e99e4f8ca727",
+  "originHash" : "02f18e84e70de6a621af77de0f96f241003ad5c8bb662c577de8ce419e8efaa7",
   "pins" : [
+    {
+      "identity" : "loggerhelper",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/Krusty84/LoggerHelper",
+      "state" : {
+        "revision" : "d65238199e06a607c5db962787e626a92b9990e7",
+        "version" : "1.0.0"
+      }
+    },
     {
       "identity" : "tcswiftbridge",
       "kind" : "remoteSourceControl",

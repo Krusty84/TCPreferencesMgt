@@ -11,33 +11,45 @@ import SwiftData
 struct SettingsView: View {
     @Environment(\.modelContext) private var context
     @Query(sort: \TCConnection.name, order: .forward) private var connections: [TCConnection]
-
+    
     @State private var draft = DraftConnection()
     @State private var selectedID: UUID? = nil
     @State private var showDeleteConfirm = false
+    
+    // Tabs: 0 = General, 1 = Teamcenter
+    @State private var selectedTab: Int = 0
+    
+    @StateObject private var vm = SettingsViewModel()
     
     // Resolve live model from ID
     private var selection: TCConnection? {
         guard let id = selectedID else { return nil }
         return connections.first(where: { $0.id == id })
     }
-
+    
     var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text("Teamcenter Connections").font(.title2)
-
-            HStack(alignment: .top, spacing: 0) {
-                leftSide
-                    .frame(width: 260, alignment: .topLeading)
-                Divider()
-                rightSide
-                    .frame(maxWidth: .infinity, alignment: .topLeading)
-                    //.padding(.leading, 8)
+        VStack(alignment: .leading, spacing: 0) {
+            // Segmented tabs
+            Picker("", selection: $selectedTab) {
+                Text("General").tag(0)
+                Text("Teamcenter").tag(1)
             }
+            .pickerStyle(.segmented)
+            .padding(.horizontal, 20)
+            .padding(.top, 12)
+            
+            Divider().padding(.top, 12)
+            
+            // Content by tab
+            Group {
+                switch selectedTab {
+                    case 0: generalSettingsTab
+                    case 1: teamcenterTab
+                    default: EmptyView()
+                }
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
-        .padding(20)
-        .frame(minWidth: 700, minHeight: 380)
-        // If selected model disappears after delete, clear selection and reset draft
         .onChange(of: connections) { _, conns in
             if let id = selectedID, conns.first(where: { $0.id == id }) == nil {
                 selectedID = nil
@@ -45,7 +57,53 @@ struct SettingsView: View {
             }
         }
     }
-
+    
+    // MARK: - Tab: General
+    private var generalSettingsTab: some View {
+        // Use Form for native settings look
+        ScrollView {
+            VStack(spacing: 10) {
+                Section {
+                    HStack(spacing: 20) {
+                        Toggle("Application Logging", isOn: $vm.appLoggingEnabled)
+                            .toggleStyle(.switch)
+                            .help("Enable/disable application logging")
+                        Spacer()
+                    }
+                    .padding(.horizontal, 8)
+                } header: {
+                    // If you already have SectionHeader in your project, this will work.
+                    // If not, replace with: Text("Application Preferences")
+                    SectionHeader(title: "Application Preferences",
+                                  systemImage: "gearshape.fill",
+                                  isExpanded: true)
+                }
+            }
+            .padding(20)
+        }
+        
+        
+    }
+    
+    // MARK: - Tab: Teamcenter (your existing UI)
+    private var teamcenterTab: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text("Connections").font(.title2)
+                .padding(.horizontal, 20)
+                .padding(.top, 12)
+            
+            HStack(alignment: .top, spacing: 0) {
+                leftSide
+                    .frame(width: 260, alignment: .topLeading)
+                Divider()
+                rightSide
+                    .frame(maxWidth: .infinity, alignment: .topLeading)
+            }
+            .padding(.horizontal, 20)
+            .padding(.bottom, 16)
+        }
+    }
+    
     // MARK: - Left
     private var leftSide: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -59,17 +117,16 @@ struct SettingsView: View {
                             .font(.subheadline)
                             .foregroundStyle(.secondary)
                     }
-                    .tag(conn.id) // selection by UUID
+                    .tag(conn.id)
                 }
-                .onDelete(perform: deleteConnections) // ⌫ key works too
+                .onDelete(perform: deleteConnections)
             }
             .frame(width: 240, height: 320)
             .listStyle(.inset)
-
-            // BUTTONS just under the list
+            
+            // BUTTONS
             HStack(spacing: 8) {
                 Button {
-                    // Open blank form on right
                     selectedID = nil
                     draft = DraftConnection()
                 } label: {
@@ -78,7 +135,7 @@ struct SettingsView: View {
                 .controlSize(.regular)
                 .buttonStyle(.bordered)
                 .help("Create a new connection")
-
+                
                 Button(role: .destructive) {
                     showDeleteConfirm = true
                 } label: {
@@ -88,7 +145,7 @@ struct SettingsView: View {
                 .buttonStyle(.bordered)
                 .disabled(selection == nil)
                 .help("Delete selected connection")
-
+                
                 Spacer(minLength: 0)
             }
             .padding(.horizontal, 4)
@@ -101,16 +158,15 @@ struct SettingsView: View {
             Button("Cancel", role: .cancel) { }
         }
     }
-
+    
     // MARK: - Right
     private var rightSide: some View {
         Group {
             if let conn = selection {
                 TCConnectionEditorView(
                     connection: conn,
-                    onDeleted: { selectedID = nil } // notify parent to clear selection
+                    onDeleted: { selectedID = nil }
                 )
-              //  .frame(minWidth: 360, minHeight: 320, alignment: .topLeading)
             } else {
                 ConnectionFormView(
                     title: "New Connection",
@@ -121,17 +177,20 @@ struct SettingsView: View {
                         username: $draft.username,
                         password: $draft.password
                     ),
-                    rightTop: { EmptyView() },       // no status/verify for create
-                    footer: {
+                    rightTop: { EmptyView() },
+                    footer: { isValidTCURL in
                         Spacer()
                         Button("Add") { addConnection() }
-                            .disabled(draft.name.trimmed.isEmpty || draft.url.trimmed.isEmpty)
+                            .disabled(draft.name.trimmed.isEmpty ||
+                                      draft.url.trimmed.isEmpty ||
+                                      !isValidTCURL)
                     }
                 )
+                .padding(.leading, 8) // small left gap for nicer look
             }
         }
     }
-
+    
     // MARK: - Actions
     private func addConnection() {
         let item = TCConnection(
@@ -146,19 +205,18 @@ struct SettingsView: View {
         draft = DraftConnection()
         selectedID = item.id
     }
-
+    
     private func removeSelected() {
         guard let sel = selection else { return }
         context.delete(sel)
         try? context.save()
         selectedID = nil
     }
-
+    
     private func deleteConnections(_ indexSet: IndexSet) {
         let toDelete = indexSet.map { connections[$0] }
         toDelete.forEach(context.delete)
         try? context.save()
-        // selection will auto-clear via onChange if needed
     }
     
     private func confirmedRemoveSelected() {
@@ -182,3 +240,21 @@ private extension String {
     var trimmed: String { trimmingCharacters(in: .whitespacesAndNewlines) }
 }
 
+// Custom SectionHeader view that shows disclosure indicator
+struct SectionHeader: View {
+    let title: String
+    let systemImage: String
+    var isExpanded: Bool
+    
+    var body: some View {
+        HStack {
+            Label(title, systemImage: systemImage)
+                .font(.headline)
+            Spacer()
+            Image(systemName: isExpanded ? "chevron.down" : "chevron.right")
+                .foregroundColor(.secondary)
+                .font(.caption)
+        }
+        .contentShape(Rectangle())
+    }
+}

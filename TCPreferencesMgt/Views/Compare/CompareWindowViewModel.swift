@@ -9,6 +9,7 @@ import Foundation
 import SwiftUI
 import SwiftData
 import TCSwiftBridge
+import LoggerHelper
 
 @MainActor
 final class CompareWindowViewModel: ObservableObject {
@@ -197,7 +198,7 @@ final class CompareWindowViewModel: ObservableObject {
             connSnapshotTS[p.id] = computeSnapshotTime(for: p.id) ?? Date()
             primaryUpdateError = nil
         } catch {
-            print("Update Primary failed:", error)
+            LoggerHelper.error("Update Primary failed: \(error)")
             primaryUpdateError = readableUpdateError(error)
             primaryIsFresh = false
         }
@@ -219,7 +220,7 @@ final class CompareWindowViewModel: ObservableObject {
                 connSnapshotTS[conn.id] = computeSnapshotTime(for: conn.id) ?? Date()
                 secondaryUpdateErrors[conn.id] = nil
             } catch {
-                print("Update Secondary[\(idx)] failed:", error)
+                LoggerHelper.error("Update Secondary[\(idx)] failed: \(error)")
                 secondaryIsFresh[idx] = false
                 secondaryUpdateErrors[conn.id] = readableUpdateError(error)
             }

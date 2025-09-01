@@ -10,6 +10,7 @@ import SwiftUI
 import SwiftData
 import AppKit
 import UniformTypeIdentifiers
+import LoggerHelper
 
 @MainActor
 final class TCPreferencesBrowserViewModel: ObservableObject {
@@ -154,7 +155,7 @@ final class TCPreferencesBrowserViewModel: ObservableObject {
             loaded += batch.count
             allLoaded = batch.count < pageSize
         } catch {
-            print("Batch fetch error:", error)
+            LoggerHelper.error("Batch fetch error: \(error)")
         }
     }
 
@@ -259,7 +260,7 @@ final class TCPreferencesBrowserViewModel: ObservableObject {
             predicate: #Predicate { $0.preference?.id == idConst },
             sortBy: [SortDescriptor(\TCPreferenceRevision.capturedAt, order: .reverse)]
         )
-        do { return try context.fetch(d) } catch { print("Fetch revisions error:", error); return [] }
+        do { return try context.fetch(d) } catch { LoggerHelper.error("Fetch revisions error: \(error)"); return [] }
     }
 
     func hasHistory(_ pref: TCPreference) -> Bool {
@@ -270,7 +271,7 @@ final class TCPreferencesBrowserViewModel: ObservableObject {
             predicate: #Predicate<TCPreferenceRevision> { rev in rev.preference?.key == keyConst }
         )
         d.fetchLimit = 2
-        do { return try context.fetch(d).count > 1 } catch { print("History fetch error:", error); return false }
+        do { return try context.fetch(d).count > 1 } catch { LoggerHelper.error("History fetch error: \(error)"); return false }
     }
 
     func historyCount(for pref: TCPreference) -> Int {
@@ -299,7 +300,7 @@ final class TCPreferencesBrowserViewModel: ObservableObject {
     func saveValues() {
         guard let idx = currentIndex else { return }
         items[idx].values = draftValues
-        do { try context.save() } catch { print("Save values error:", error) }
+        do { try context.save() } catch { LoggerHelper.error("Save values error: \(error)") }
         cancelValues()
     }
 
@@ -316,7 +317,7 @@ final class TCPreferencesBrowserViewModel: ObservableObject {
     func saveComment() {
         guard let idx = currentIndex else { return }
         items[idx].comment = draftComment
-        do { try context.save() } catch { print("Save comment error:", error) }
+        do { try context.save() } catch { LoggerHelper.error("Save comment error: \(error)")}
         cancelComment()
     }
 
@@ -369,7 +370,7 @@ final class TCPreferencesBrowserViewModel: ObservableObject {
             guard response == .OK, let url = panel.url else { return }
             guard let self else { return }
             let xml = self.buildPreferencesXML(chosen)
-            do { try xml.data(using: .utf8)?.write(to: url) } catch { print("Export failed:", error) }
+            do { try xml.data(using: .utf8)?.write(to: url) } catch { LoggerHelper.error("Export failed: \(error)")}
         }
     }
 
@@ -382,7 +383,7 @@ final class TCPreferencesBrowserViewModel: ObservableObject {
 
         panel.begin { response in
             guard response == .OK, let url = panel.url else { return }
-            do { try xml.data(using: .utf8)?.write(to: url) } catch { print("Export failed:", error) }
+            do { try xml.data(using: .utf8)?.write(to: url) } catch { LoggerHelper.error("Export failed: \(error)") }
         }
     }
     
@@ -550,7 +551,7 @@ final class TCPreferencesBrowserViewModel: ObservableObject {
             }
         }
 
-        do { try context.save() } catch { print("Assign to collection save error:", error) }
+        do { try context.save() } catch { LoggerHelper.error("Assign to collection save error: \(error)")}
         refreshCollections()
     }
 
@@ -584,7 +585,7 @@ final class TCPreferencesBrowserViewModel: ObservableObject {
         do {
             try context.save()
         } catch {
-            print("Failed to assign prefs to collection: \(error)")
+            LoggerHelper.error("Failed to assign prefs to collection: \(error)")
         }
         refreshCollections()
     }
@@ -596,7 +597,7 @@ final class TCPreferencesBrowserViewModel: ObservableObject {
             try context.save()
             refreshCollections()
         } catch {
-            print("Failed to delete collection:", error)
+            LoggerHelper.error("Failed to delete collection: \(error)")
         }
     }
 
@@ -609,7 +610,7 @@ final class TCPreferencesBrowserViewModel: ObservableObject {
                 context.delete(link)
             }
         }
-        do { try context.save() } catch { print("Remove from collection failed:", error) }
+        do { try context.save() } catch { LoggerHelper.error("Remove from collection failed: \(error)")}
         refreshCollections()
     }
 
@@ -638,7 +639,7 @@ final class TCPreferencesBrowserViewModel: ObservableObject {
                 lastSyncMessage = "Preferences synced."
             } catch {
                 lastSyncMessage = "Sync failed: \(error.localizedDescription)"
-                print("TC Sync error:", error)
+                LoggerHelper.error("TC Synchronization error: \(error)")
             }
             isSyncing = false
         }
