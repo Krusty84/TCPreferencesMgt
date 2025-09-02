@@ -70,6 +70,7 @@ struct TCPreferencesBrowserView: View {
                 expandedCollections = Set(vm.collections.map(\.key))
             }
         }
+        .environmentObject(vm)
     }
 }
 
@@ -256,9 +257,12 @@ private extension TCPreferencesBrowserView {
                                     }
                                 )
                             ) {
+//                                let prefs = col.prefCollections
+//                                    .compactMap { $0.preference }
+//                                    .sorted { $0.name.localizedCompare($1.name) == .orderedAscending }
+//                                
                                 let prefs = col.prefCollections
                                     .compactMap { $0.preference }
-                                    .sorted { $0.name.localizedCompare($1.name) == .orderedAscending }
                                 
                                 if prefs.isEmpty {
                                     Text("No preferences assigned")
@@ -660,52 +664,77 @@ private extension TCPreferencesBrowserView {
     func historySection(p: TCPreference) -> some View {
         GroupBox("History") {
             ScrollView(.vertical) {
-                LazyVStack(alignment: .leading, spacing: 8) {
-                    let revs = vm.revisions(for: p)
-                    if revs.isEmpty {
-                        Text("No history recorded")
-                            .foregroundStyle(.secondary)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .padding(6)
-                    } else {
-                        ForEach(revs) { rev in
-                            VStack(alignment: .leading, spacing: 6) {
-                                // Header row
-                                HStack(spacing: 8) {
-                                    Text(rev.capturedAt.formatted(date: .numeric, time: .shortened))
-                                        .font(.caption)
-                                        .foregroundStyle(.secondary)
-                                    Spacer()
-                                    Button { vm.copyHistoryRevisionXML(pref: p, rev: rev) } label: {
-                                        Image(systemName: "clipboard")
-                                    }
-                                    .buttonStyle(.borderless)
-                                    .help("Copy this revision of the preference to the clipboard")
-                                }
-                                // Values body
-                                if let vals = rev.values, !vals.isEmpty {
-                                    Text(vals.joined(separator: ", "))
-                                        .textSelection(.enabled)
-                                        .font(.system(size: 13))
-                                        .frame(maxWidth: .infinity, alignment: .leading)
-                                } else {
-                                    Text("—").foregroundStyle(.secondary)
-                                }
-                            }
-                            .padding(6)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .background(Color.gray.opacity(0.05))
-                            .cornerRadius(4)
-                            Divider().opacity(0.25)
-                        }
-                    }
-                }
-                .padding(2)
+                HistoryList(prefID: p.persistentModelID)
             }
             .frame(minHeight: 140, maxHeight: 220)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
     }
+    
+    private struct HistoryList: View {
+        let prefID: PersistentIdentifier
+        @EnvironmentObject var vm: TCPreferencesBrowserViewModel
+        @State private var revs: [TCPreferenceRevision] = []
+
+        var body: some View {
+            LazyVStack(alignment: .leading, spacing: 8) {
+                if revs.isEmpty {
+                    Text("No history recorded")
+                        .foregroundStyle(.secondary)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(6)
+                } else {
+                    // 👇 explicit id helps the type-checker
+                    ForEach(revs, id: \.persistentModelID) { rev in
+                        HistoryRow(prefID: prefID, rev: rev)
+                        Divider().opacity(0.25)
+                    }
+                }
+            }
+            .padding(2)
+            .task(id: prefID) {
+                revs = vm.revisions(for: prefID)
+            }
+        }
+    }
+
+    private struct HistoryRow: View {
+        let prefID: PersistentIdentifier
+        let rev: TCPreferenceRevision
+        @EnvironmentObject var vm: TCPreferencesBrowserViewModel
+
+        var body: some View {
+            VStack(alignment: .leading, spacing: 6) {
+                HStack(spacing: 8) {
+                    Text(rev.capturedAt.formatted(date: .numeric, time: .shortened))
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    Spacer()
+                    Button {
+                        vm.copyHistoryRevisionXML(prefID: prefID, rev: rev)
+                    } label: {
+                        Image(systemName: "clipboard")
+                    }
+                    .buttonStyle(.borderless)
+                    .help("Copy this revision of the preference to the clipboard")
+                }
+
+                if let vals = rev.values, !vals.isEmpty {
+                    Text(vals.joined(separator: ", "))
+                        .textSelection(.enabled)
+                        .font(.system(size: 13))
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                } else {
+                    Text("—").foregroundStyle(.secondary)
+                }
+            }
+            .padding(6)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(Color.gray.opacity(0.05))
+            .cornerRadius(4)
+        }
+    }
+
 
     // Comment block
     @ViewBuilder
@@ -941,4 +970,5 @@ private extension TCPreferencesBrowserView {
         .padding(20)
         .frame(width: 420)
     }
+    
 }

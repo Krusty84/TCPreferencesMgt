@@ -130,6 +130,7 @@ final class TCPreferencesBrowserViewModel: ObservableObject {
     }
 
     // MARK: - Loading
+    @MainActor
     func initialLoad() {
         guard context != nil else { return }
         loaded = 0
@@ -138,6 +139,7 @@ final class TCPreferencesBrowserViewModel: ObservableObject {
         loadNextBatch()
     }
 
+    @MainActor
     func loadNextBatch() {
         guard context != nil, !allLoaded else { return }
         let idConst = connectionID
@@ -167,6 +169,7 @@ final class TCPreferencesBrowserViewModel: ObservableObject {
         loadNextBatch()
     }
 
+    @MainActor
     private func fetchConnection() {
         guard context != nil else { return }
         let idConst = connectionID
@@ -174,6 +177,7 @@ final class TCPreferencesBrowserViewModel: ObservableObject {
         do { connection = try context.fetch(d).first } catch { connection = nil }
     }
 
+    @MainActor
     func refreshCollections() {
         guard context != nil else { collections = []; return }
         let descriptor = FetchDescriptor<TCPreferenceCollection>(
@@ -186,6 +190,7 @@ final class TCPreferencesBrowserViewModel: ObservableObject {
     /// Fetch by exact names and/or substring terms (case-insensitive).
     /// - Exact name: contains a dot, e.g. "BOMItem.SUMMARYRENDERING"
     /// - Substring term: no dot, e.g. "RENDERING", "SUMMARYRENDERING"
+    @MainActor
     func fetchPrefs(for namesOrTerms: [String]) -> [TCPreference] {
         guard !namesOrTerms.isEmpty else { return [] }
 
@@ -240,6 +245,7 @@ final class TCPreferencesBrowserViewModel: ObservableObject {
     }
 
     // MARK: - Status & History
+    @MainActor
     func status(for p: TCPreference) -> PrefStatus {
         guard let conn = connection,
               let runEnd = conn.lastImportCompletedAt,
@@ -252,17 +258,22 @@ final class TCPreferencesBrowserViewModel: ObservableObject {
         if let changed = p.lastChangedAt, changed >= runStart { return .changed }
         return .stable
     }
+    
+    @MainActor
+    func revisions(for id: PersistentIdentifier) -> [TCPreferenceRevision] {
+        // re-fetch the preference on this context
+        let predPref = #Predicate<TCPreference> { $0.persistentModelID == id }
+        var fdPref = FetchDescriptor<TCPreference>(predicate: predPref, sortBy: [])
+        guard let pref = try? context.fetch(fdPref).first else { return [] }
 
-    func revisions(for pref: TCPreference) -> [TCPreferenceRevision] {
-        guard context != nil else { return [] }
-        let idConst = pref.id
-        var d = FetchDescriptor<TCPreferenceRevision>(
-            predicate: #Predicate { $0.preference?.id == idConst },
-            sortBy: [SortDescriptor(\TCPreferenceRevision.capturedAt, order: .reverse)]
+        var fd = FetchDescriptor<TCPreferenceRevision>(
+            predicate: #Predicate { $0.preference?.persistentModelID == id },
+            sortBy: [SortDescriptor(\.capturedAt, order: .reverse)]
         )
-        do { return try context.fetch(d) } catch { LoggerHelper.error("Fetch revisions error: \(error)"); return [] }
+        return (try? context.fetch(fd)) ?? []
     }
 
+    @MainActor
     func hasHistory(_ pref: TCPreference) -> Bool {
         if pref.revisions.count > 1 { return true }
         guard context != nil else { return false }
@@ -274,6 +285,7 @@ final class TCPreferencesBrowserViewModel: ObservableObject {
         do { return try context.fetch(d).count > 1 } catch { LoggerHelper.error("History fetch error: \(error)"); return false }
     }
 
+    @MainActor
     func historyCount(for pref: TCPreference) -> Int {
         if !pref.revisions.isEmpty { return pref.revisions.count }
         guard context != nil else { return 0 }
@@ -322,8 +334,8 @@ final class TCPreferencesBrowserViewModel: ObservableObject {
     }
 
     private var currentIndex: Int? {
-        guard let id = selection.first else { return nil }
-        return items.firstIndex { $0.id == id }
+        guard let pid = selection.first else { return nil }
+        return items.firstIndex { $0.persistentModelID == pid }
     }
 
     private func clearEditsOnSelectionChange() {
@@ -401,7 +413,10 @@ final class TCPreferencesBrowserViewModel: ObservableObject {
         copyToClipboard(xml)
     }
     
-    func copyHistoryRevisionXML(pref: TCPreference, rev: TCPreferenceRevision) {
+    func copyHistoryRevisionXML(prefID: PersistentIdentifier, rev: TCPreferenceRevision) {
+        let pred = #Predicate<TCPreference> { $0.persistentModelID == prefID }
+        var fd = FetchDescriptor<TCPreference>(predicate: pred)
+        guard let pref = try? context.fetch(fd).first else { return }
         var xml = ""
         xml += "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
         xml += "<preferences version=\"10.0\">\n"
@@ -520,6 +535,7 @@ final class TCPreferencesBrowserViewModel: ObservableObject {
         }
     }
 
+    @MainActor
     func assignSelectionToCollection() {
        // let chosenPrefs = filteredItems.filter { selection.contains($0.id) }
         let chosenPrefs = filteredItems.filter { selection.contains($0.persistentModelID) }
@@ -561,6 +577,7 @@ final class TCPreferencesBrowserViewModel: ObservableObject {
         newCollectionName = ""
     }
 
+    @MainActor
     func assignToCollection(prefs: [TCPreference], name: String) {
         guard !name.isEmpty else { return }
 
@@ -590,6 +607,7 @@ final class TCPreferencesBrowserViewModel: ObservableObject {
         refreshCollections()
     }
 
+    @MainActor
     func deleteCollection(_ col: TCPreferenceCollection) {
         guard col.prefCollections.isEmpty else { return }
         context.delete(col)
@@ -601,6 +619,7 @@ final class TCPreferencesBrowserViewModel: ObservableObject {
         }
     }
 
+    @MainActor
     func removePreferencesFromCollection(selection: Set<TCPreference.ID>, collection: TCPreferenceCollection) {
         let prefs = filteredItems.filter { selection.contains($0.id) }
         guard !prefs.isEmpty else { return }
@@ -615,6 +634,7 @@ final class TCPreferencesBrowserViewModel: ObservableObject {
     }
 
     // MARK: - Sync
+    @MainActor
     func tcSync() {
         guard let conn = connection else { return }
         isSyncing = true
