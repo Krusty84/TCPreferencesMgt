@@ -136,12 +136,6 @@ private extension TCPreferencesBrowserView {
                 Divider()
                 Button("Assign to collection…") { showAssignDialog = true }
                     .disabled(selection.isEmpty)
-                Divider()
-                Button("Compare to…") {
-                       vm.compareSelection = selection
-                       showCompareSheet = true
-                }
-                .disabled(selection.isEmpty)
             }
             .sheet(isPresented: $showAssignDialog) {
                 assignCollectionSheet
@@ -361,7 +355,7 @@ private extension TCPreferencesBrowserView {
     @ViewBuilder
     var preferencesImportantForPerfomance: some View {
         DisclosureGroup("Important for performance") {
-            let importantPreferences: [TCPreference] = vm.fetchPrefs(for: vm.perfomanceCriticalPreferencesList) // TODO: rename bad name
+            let importantPreferences: [TCPreference] = vm.fetchPrefs(for: vm.perfomanceCriticalPreferencesList)
             performanceTable(importantPreferences)
         }
         .padding(8)
@@ -463,7 +457,7 @@ private struct ComparePickerSheet: View {
             Text("You can select two or more.")
                 .foregroundStyle(.secondary)
 
-            // ✅ single data source; no nested ForEach
+            // single data source; no nested ForEach
             List(options, selection: $chosen) { c in
                 HStack {
                     VStack(alignment: .leading, spacing: 2) {
@@ -474,7 +468,7 @@ private struct ComparePickerSheet: View {
                             .foregroundStyle(.secondary)
                     }
                     Spacer()
-                    Text(c.username).foregroundStyle(.secondary)
+                    Text(c.desc).foregroundStyle(.secondary)
                 }
                 .tag(c.id) // multi-select uses Set<UUID>
                 .contentShape(Rectangle())
@@ -684,7 +678,7 @@ private extension TCPreferencesBrowserView {
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .padding(6)
                 } else {
-                    // 👇 explicit id helps the type-checker
+                    // explicit id helps the type-checker
                     ForEach(revs, id: \.persistentModelID) { rev in
                         HistoryRow(prefID: prefID, rev: rev)
                         Divider().opacity(0.25)
@@ -878,9 +872,6 @@ private extension TCPreferencesBrowserView {
                 Button("Export…") { vm.exportPreferencesXML(selection: selection) }
                     .disabled(selection.isEmpty)
                 Button("Copy to clipboard…") { vm.copyPreferencesXML(selection: selection) }
-                    .disabled(selection.isEmpty)
-                Divider()
-                Button("Compare to…") { showCompareSheet = true }
                     .disabled(selection.isEmpty)
                 Divider()
                 Button("Assign to collection…") { showAssignDialog = true }

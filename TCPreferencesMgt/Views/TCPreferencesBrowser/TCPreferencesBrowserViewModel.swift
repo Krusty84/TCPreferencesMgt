@@ -24,12 +24,6 @@ final class TCPreferencesBrowserViewModel: ObservableObject {
     @Published var collections: [TCPreferenceCollection] = []
 
     // MARK: - UI State & Filters
-//    @Published var selection: Set<TCPreference.ID> = [] {
-//        didSet {
-//            clearEditsOnSelectionChange()
-//            updatePinCategory()
-//        }
-//    }
     @Published var selection: Set<PersistentIdentifier> = []
     @Published var compareSelection: Set<PersistentIdentifier> = []
     @Published var nameFilter: String = ""
@@ -96,11 +90,6 @@ final class TCPreferencesBrowserViewModel: ObservableObject {
     }
 
     // MARK: - Derived
-//    var selectedPref: TCPreference? {
-//        guard let id = selection.first else { return nil }
-//        return items.first { $0.id == id }
-//    }
-    
     var selectedPref: TCPreference? {
         guard let id = selection.first else { return nil }
         return items.first { $0.persistentModelID == id }
@@ -445,10 +434,6 @@ final class TCPreferencesBrowserViewModel: ObservableObject {
 
         copyToClipboard(xml)
     }
-
-//    private func prefs(from selection: Set<TCPreference.ID>) -> [TCPreference] {
-//        items.filter { selection.contains($0.id) }
-//    }
     
     private func prefs(from selection: Set<PersistentIdentifier>) -> [TCPreference] {
         items.filter { selection.contains($0.persistentModelID) }
