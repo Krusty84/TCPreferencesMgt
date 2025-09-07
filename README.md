@@ -1,4 +1,4 @@
-# TCPreferencesMgt
+# TCPreferencesMgt [![Download on the Mac App Store](https://developer.apple.com/app-store/marketing/guidelines/images/badge-download-on-the-app-store.svg)](https://apps.apple.com/us/app/teamcenter-preferences-mgt/id6751907205)
 
 ## 🚀 What is this?
 
